@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="hcBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <filter id="s3">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <rect width="800" height="400" rx="14" fill="url(#hcBg)"/>
+
+  <text x="400" y="36" text-anchor="middle" fill="#e2e8f0" font-size="20" font-weight="700">How It Works</text>
+  <text x="400" y="56" text-anchor="middle" fill="#94a3b8" font-size="12">Design your org. Give it a task. Your agent runs every role.</text>
+
+  <!-- ================================================================ -->
+  <!-- Step 1: DESIGN YOUR ORG -->
+  <!-- ================================================================ -->
+  <rect x="30" y="80" width="220" height="210" rx="10" fill="#111827" stroke="#8b5cf6" stroke-width="1.5" filter="url(#s3)"/>
+
+  <circle cx="68" cy="106" r="14" fill="#1e1b4b" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="68" y="111" text-anchor="middle" fill="#a78bfa" font-size="13" font-weight="700">1</text>
+  <text x="92" y="111" fill="#a78bfa" font-size="14" font-weight="700">Design Your Org</text>
+
+  <rect x="50" y="130" width="180" height="30" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="70" cy="145" r="6" fill="#f59e0b"/>
+  <text x="84" y="149" fill="#e2e8f0" font-size="11">Roles</text>
+  <text x="215" y="149" text-anchor="end" fill="#64748b" font-size="9">who does what</text>
+
+  <rect x="50" y="168" width="180" height="30" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="70" cy="183" r="6" fill="#3b82f6"/>
+  <text x="84" y="187" fill="#e2e8f0" font-size="11">Teams</text>
+  <text x="215" y="187" text-anchor="end" fill="#64748b" font-size="9">in what order</text>
+
+  <rect x="50" y="206" width="180" height="30" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="70" cy="221" r="6" fill="#22d3ee"/>
+  <text x="84" y="225" fill="#e2e8f0" font-size="11">Policies</text>
+  <text x="215" y="225" text-anchor="end" fill="#64748b" font-size="9">how strict</text>
+
+  <rect x="50" y="244" width="180" height="30" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="70" cy="259" r="6" fill="#10b981"/>
+  <text x="84" y="263" fill="#e2e8f0" font-size="11">Contracts</text>
+  <text x="215" y="263" text-anchor="end" fill="#64748b" font-size="9">handoff format</text>
+
+  <!-- Arrow 1 to 2 -->
+  <line x1="250" y1="185" x2="285" y2="185" stroke="#475569" stroke-width="2"/>
+  <polygon points="281,179 293,185 281,191" fill="#475569"/>
+
+  <!-- ================================================================ -->
+  <!-- Step 2: GIVE IT A TASK -->
+  <!-- ================================================================ -->
+  <rect x="293" y="80" width="220" height="210" rx="10" fill="#111827" stroke="#f59e0b" stroke-width="1.5" filter="url(#s3)"/>
+
+  <circle cx="331" cy="106" r="14" fill="#451a03" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="331" y="111" text-anchor="middle" fill="#fbbf24" font-size="13" font-weight="700">2</text>
+  <text x="355" y="111" fill="#fbbf24" font-size="14" font-weight="700">Give It a Task</text>
+
+  <!-- Task card -->
+  <rect x="313" y="135" width="180" height="140" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+
+  <text x="333" y="158" fill="#fbbf24" font-size="10" font-weight="600">Objective</text>
+  <text x="333" y="173" fill="#94a3b8" font-size="10">What needs to happen</text>
+
+  <line x1="333" y1="182" x2="473" y2="182" stroke="#1e293b" stroke-width="1"/>
+
+  <text x="333" y="200" fill="#fbbf24" font-size="10" font-weight="600">Scope</text>
+  <text x="333" y="215" fill="#94a3b8" font-size="10">What's in, what's out</text>
+
+  <line x1="333" y1="224" x2="473" y2="224" stroke="#1e293b" stroke-width="1"/>
+
+  <text x="333" y="242" fill="#fbbf24" font-size="10" font-weight="600">Acceptance criteria</text>
+  <text x="333" y="257" fill="#94a3b8" font-size="10">How to know it's done</text>
+
+  <!-- Arrow 2 to 3 -->
+  <line x1="513" y1="185" x2="548" y2="185" stroke="#475569" stroke-width="2"/>
+  <polygon points="544,179 556,185 544,191" fill="#475569"/>
+
+  <!-- ================================================================ -->
+  <!-- Step 3: YOUR ORG RUNS -->
+  <!-- ================================================================ -->
+  <rect x="556" y="80" width="220" height="210" rx="10" fill="#111827" stroke="#22c55e" stroke-width="1.5" filter="url(#s3)"/>
+
+  <circle cx="594" cy="106" r="14" fill="#052e16" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="594" y="111" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="700">3</text>
+  <text x="618" y="111" fill="#22c55e" font-size="14" font-weight="700">Your Org Runs</text>
+
+  <!-- Role execution chain -->
+  <rect x="576" y="132" width="180" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="592" cy="146" r="4" fill="#f59e0b"/>
+  <text x="604" y="150" fill="#94a3b8" font-size="10">Role A scopes</text>
+  <text x="745" y="150" text-anchor="end" fill="#22c55e" font-size="9">&#10003;</text>
+
+  <rect x="576" y="165" width="180" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="592" cy="179" r="4" fill="#3b82f6"/>
+  <text x="604" y="183" fill="#94a3b8" font-size="10">Role B designs</text>
+  <text x="745" y="183" text-anchor="end" fill="#22c55e" font-size="9">&#10003;</text>
+
+  <rect x="576" y="198" width="180" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="592" cy="212" r="4" fill="#10b981"/>
+  <text x="604" y="216" fill="#94a3b8" font-size="10">Role C executes</text>
+  <text x="745" y="216" text-anchor="end" fill="#22c55e" font-size="9">&#10003;</text>
+
+  <rect x="576" y="231" width="180" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="592" cy="245" r="4" fill="#f97316"/>
+  <text x="604" y="249" fill="#94a3b8" font-size="10">Role D checks</text>
+  <text x="745" y="249" text-anchor="end" fill="#22c55e" font-size="9">&#10003;</text>
+
+  <rect x="576" y="264" width="180" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="592" cy="278" r="4" fill="#ec4899"/>
+  <text x="604" y="282" fill="#94a3b8" font-size="10">Role E reviews</text>
+  <text x="745" y="282" text-anchor="end" fill="#22c55e" font-size="9">&#10003;</text>
+
+  <!-- ================================================================ -->
+  <!-- Bottom: Agent flexibility -->
+  <!-- ================================================================ -->
+  <rect x="30" y="315" width="740" height="65" rx="10" fill="#111827" stroke="#334155" stroke-width="1" filter="url(#s3)"/>
+
+  <text x="400" y="342" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Your org runs on any agent</text>
+
+  <rect x="120" y="352" width="90" height="20" rx="4" fill="#1e293b" stroke="#22d3ee" stroke-width="1"/>
+  <text x="165" y="366" text-anchor="middle" fill="#22d3ee" font-size="10">Claude</text>
+
+  <rect x="230" y="352" width="90" height="20" rx="4" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+  <text x="275" y="366" text-anchor="middle" fill="#94a3b8" font-size="10">Cursor</text>
+
+  <rect x="340" y="352" width="120" height="20" rx="4" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+  <text x="400" y="366" text-anchor="middle" fill="#94a3b8" font-size="10">Your runtime</text>
+
+  <rect x="480" y="352" width="90" height="20" rx="4" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+  <text x="525" y="366" text-anchor="middle" fill="#94a3b8" font-size="10">Any LLM</text>
+
+  <rect x="590" y="352" width="90" height="20" rx="4" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+  <text x="635" y="366" text-anchor="middle" fill="#94a3b8" font-size="10">Any API</text>
+</svg>

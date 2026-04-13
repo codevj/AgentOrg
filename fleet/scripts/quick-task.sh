@@ -20,8 +20,8 @@ $TITLE
 
 ## Scope
 
-- In scope:
-- Out of scope:
+- In scope: whatever is needed to achieve the objective
+- Out of scope: unrelated changes
 
 ## Acceptance criteria
 
@@ -35,6 +35,10 @@ $TITLE
 \`\`\`
 EOF
 
+echo "--- Task file: $TASK_FILE ---" >&2
+echo "--- Edit it if needed, then use the prompt below ---" >&2
+echo "" >&2
+
 if [[ "$MODE" == "solo" ]]; then
   "$ROOT_DIR/fleet/scripts/generate-run-prompt.sh" \
     --mode solo \
@@ -45,7 +49,3 @@ else
     --team "$TEAM" \
     --task "$TASK_FILE"
 fi
-
-echo
-echo "Task file created at: $TASK_FILE"
-echo "Edit it if needed, then paste the generated prompt into Cursor/Claude."
