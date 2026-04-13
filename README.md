@@ -1,108 +1,566 @@
 # AgentOrg
 
-Build your own AI organization — a reusable team of agent roles that work together on any task you throw at them.
+Turn Claude Code, Cursor, or Copilot into a team that reviews its own work, enforces quality gates, and gets smarter with every task.
 
-When you ask an AI to do something, it gives you one shot — one perspective, no review, no structure. Simple tasks work fine. But anything with real stakes benefits from more than one pass and more than one point of view.
+## Why
 
-AgentOrg lets you design your own organization: the roles, the order they execute, and the quality gates between them. You define it once, then reuse it across every task. The AI runs through your org in sequence, producing structured handoffs between roles. One agent, your org, enforced process.
+AI coding assistants give you one shot — one perspective, no review, no structure. Simple tasks work fine. But anything with real stakes benefits from more than one pass and more than one point of view.
 
-<p align="center">
-  <img src="images/hero.svg" alt="Your Task → Your Team → Structured Output" width="780"/>
-</p>
+AgentOrg lets you define an organization — roles, teams, handoff contracts, quality gates — and sync it to the AI assistant you already use. Each role becomes a real agent. A PM scopes the work. An architect designs it. A developer builds it. A tester validates it. A reviewer checks it. They hand off structured artifacts to each other. And the whole org learns from every run.
 
-## Build a team for anything
-
-A team is a YAML file that names roles, sets their order, and picks a governance policy. A role is a markdown file that defines a mission, required inputs, output format, and exit criteria. You build both with one command each, then reuse them forever.
-
-<p align="center">
-  <img src="images/example-orgs.svg" alt="Example Organizations" width="780"/>
-</p>
-
-AgentOrg ships with `product-delivery` and `docs-enablement` as starter teams. The system is designed for you to build your own — any workflow where structured handoffs between roles improve the output.
-
-## How it works
-
-You define roles, assemble them into teams, and set governance policies. AgentOrg takes your organization definition and your task, and produces a complete set of instructions that any capable agent can execute — each role in sequence, with structured handoffs between them.
-
-<p align="center">
-  <img src="images/handoff-chain.svg" alt="Define → Compile → Execute" width="780"/>
-</p>
-
-The roles and contracts are the stable layer. The agent that executes them is swappable — Claude today, your own runtime tomorrow.
-
-## Quick start
-
-Run a task through a team:
+## Install
 
 ```bash
-fleet/scripts/quick-task.sh team product-delivery "Add retry logic to the API client"
+# Install uv if you don't have it (https://docs.astral.sh/uv/)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install AgentOrg (requires Python 3.11+)
+uv sync && uv pip install -e .
 ```
 
-This outputs a complete set of instructions. Feed it to Claude.
-
-For an existing task spec:
+## Get started
 
 ```bash
-fleet/scripts/start-task.sh team product-delivery path/to/my-task.md
+# 1. Initialize (required — all other commands need this first)
+fleet init
 ```
 
-Solo mode (single role, just execute with guardrails):
+```
+Welcome to AgentOrg
+
+Detected backends:
+  + claude — Claude Code — native agent teams
+  + cursor — Cursor — native subagent support
+  - copilot (not installed)
+
+Backend: claude
+Default team [product-delivery]:
+Reflection mode (auto, review, off) [auto]:
+
+AgentOrg initialized.
+  Backend: claude
+
+Next:
+  fleet run "your task"
+```
 
 ```bash
-fleet/scripts/start-task.sh solo _ path/to/my-task.md
+# 2. Run a task
+fleet run "Add a /health endpoint"
 ```
 
-## Build your own org
+That's it. `fleet run` uses your default team and backend, syncs agents automatically, and executes. Override the team per-run with `--team <id>`, or change the default with `fleet context set team <id>` — see [Context switches](#context-switches). For Claude Code, agents land in `~/.claude/agents/` — available in every project you open.
 
-### Create a role
+After the run, `fleet` shows your current context:
+
+```
+AgentOrg
+
+  Backend: claude    Project: (none)    Reflection: auto
+
+  Roles: 19    Teams: 6    Skills: 4    Runs: 1
+
+Teams
+  product-delivery       program-manager architect developer tester code-reviewer
+  content-production     researcher writer editor fact-checker
+  ...
+
+Roles
+  architect              [starter]  [1 skills]  Produce a minimal, safe implementation design.
+  developer              [starter]              Implement approved design with minimal scoped changes.
+  ...
+```
+
+---
+
+## Three ways to give work
+
+### 1. Quick task — a sentence
 
 ```bash
-fleet/scripts/new-persona.sh fact-checker
+fleet run "Add a /health endpoint that returns uptime and version"
 ```
 
-This creates `fleet/core/personas/fact-checker.md` — a markdown file where you define the role's mission, what inputs it needs, what it must output, and when it's done. Edit it to fit your workflow.
+Good for small, obvious work. Agents are synced automatically before execution.
 
-### Create a team
+### 2. Task spec — a markdown file
+
+For features with scope, constraints, or acceptance criteria, scaffold a spec:
 
 ```bash
-fleet/scripts/new-team.sh content-review
+fleet project task "add rate limiting"
 ```
 
-This creates `fleet/core/teams/content-review.yaml` — a YAML file listing roles in execution order, governance policy, and quality gates. Swap in your roles, choose how strict the gates are.
+This creates a task spec with the right sections:
 
-### Create a project
+```
+Created: ~/.agent-org/projects/my-api/tasks/add-rate-limiting.md
+Edit the spec, then run:
+  fleet run ~/.agent-org/projects/my-api/tasks/add-rate-limiting.md
+```
+
+The scaffolded spec looks like:
+
+```markdown
+# Task: Add Rate Limiting
+
+## Problem
+What's wrong or missing? Why does this matter?
+
+## Solution
+What should be built? High-level approach.
+
+## Rabbit Holes
+- Things to avoid or not over-engineer
+
+## No-gos
+- Hard boundaries — what must NOT change
+
+## Acceptance Criteria
+- [ ] First criterion
+- [ ] Second criterion
+
+## Validation Commands
+```bash
+# Commands the tester should run
+```
+```
+
+Fill it in and run:
 
 ```bash
-fleet/scripts/new-project.sh my-project
+fleet run ~/.agent-org/projects/my-api/tasks/add-rate-limiting.md
 ```
 
-This scaffolds reusable context for a specific domain — background knowledge, standard commands, task templates, and failure runbooks. Projects make your teams smarter about the specific work they're doing.
+Each section shapes a different role. Architect respects Rabbit Holes. Developer respects No-gos. Tester checks Acceptance Criteria. Reviewer verifies Validation Commands passed.
 
-### Reuse across every task
+### 3. Project — persistent codebase context
 
-Once built, your org is permanent. Every new task runs through the same team, same roles, same quality gates. You evolve the org over time — add roles, tighten gates, create specialized teams for different types of work.
+If you run many tasks against the same codebase, set up a project. Every task automatically gets your codebase context.
 
-## What's inside
+```bash
+# Create a project (records current directory as the repo)
+cd ~/git/my-api
+fleet project create my-api
 
-```
-fleet/
-  core/
-    personas/       Roles you define — mission, inputs, outputs, exit criteria
-    teams/          Team compositions — which roles, what order, what governance
-    contracts/      Handoff schema — the structured output every role must produce
-    policies/       Governance (quality-first, speed-first) and execution profiles
-    modes/          Solo and team workflow definitions
-    templates/      Task spec and run summary templates
-  scripts/          Org runner and scaffolding tools
-  docs/             Architecture, quickstart, customization guides
-projects/
-  _template/        Reusable project scaffold (tasks, context, commands, runbooks)
+# Activate it
+fleet project use my-api
+
+# Now every task includes project context
+fleet run "Add rate limiting"
 ```
 
-## Design principles
+Fill in the scaffolded context files once — architecture, domain terms, build commands, known failure modes. The more you fill in, the better every run gets.
 
-- **Your org, your rules.** You define the roles, teams, and policies. AgentOrg runs them. The shipped teams are examples, not the product.
-- **Build once, reuse forever.** A team is a YAML file. A role is a markdown file. Create them once, run every task through them.
-- **Contracts are the API.** The handoff schema is the interface between roles. It's what makes roles composable — any role that speaks the schema can plug into any team.
-- **Domain-agnostic.** Software, content, strategy, ops, research — the structure works wherever multiple perspectives improve the output.
-- **Agent-agnostic.** Claude today. Your own runtime tomorrow. The org definition doesn't care what executes it.
+See [Projects](#projects) below for details.
+
+See [`agentorg/starters/examples/`](agentorg/starters/examples/) for more task spec examples.
+
+### Natural language (uses your backend LLM)
+
+Don't remember the exact command? Just say what you want:
+
+```bash
+fleet "show me all my projects"
+fleet "switch to the strategy team"
+fleet "what has my org learned"
+```
+
+Fleet sends your query to the active backend's LLM, which translates it into the right `fleet` command and runs it. You'll see the translated command before it executes:
+
+```
+→ fleet project list
+  ...
+```
+
+This costs one LLM call per query. For commands you know, use them directly — it's faster and free.
+
+---
+
+## What happens when you run a task
+
+`fleet run` syncs your agents, then hands off to your backend (Claude Code, Cursor, or Copilot). The backend runs the team — fleet doesn't stay in the middle.
+
+```
+fleet run "your task"
+  → Syncs agents to ~/.claude/agents/ (or ~/.cursor/agents/, ~/.squad/)
+  → Launches: claude --agent fleet-product-delivery-lead "your task"
+  → Claude Code takes over — you see live output
+  → fleet-lead orchestrates the team:
+
+      Stage 1:            PM → scopes the work
+      Stage 2:            Architect → designs the implementation
+      Stage 3:            Developer → writes code, runs validation
+      Stage 4 (parallel): Tester + Reviewer → both run at the same time
+      If issues found:    loops back through developer + reviewer
+
+  → Final result: what was done, files changed, how to verify
+  → Reflection → learnings saved for next time
+```
+
+**Roles run in parallel when they can.** Teams define a dependency graph — roles with the same dependencies run simultaneously. The fleet-lead spawns them using Claude Code's Agent tool, which handles parallel execution natively.
+
+For the best visual experience with parallel agents, enable tmux mode in Claude Code:
+
+```json
+// ~/.claude.json
+{ "teammateMode": "tmux" }
+```
+
+Each role produces a structured **handoff** before the next stage starts. Quality gates enforce that blocked roles stop the pipeline.
+
+---
+
+## Context switches
+
+`fleet context` shows and changes everything that affects how `fleet run` behaves:
+
+```bash
+fleet context                          # show current context
+```
+
+```
+  team:       product-delivery
+  backend:    claude
+  project:    my-api
+  reflection: auto
+  org:        default
+```
+
+```bash
+fleet context set team strategy-analysis   # switch team
+fleet context set backend cursor           # switch backend
+fleet context set project my-api           # switch project
+fleet context set reflection review        # switch reflection mode
+fleet context clear project                # deactivate project (one-off mode)
+```
+
+Then just work:
+
+```bash
+fleet run "do the thing"        # uses all the context above
+fleet reflect                   # reflects on active project
+fleet learnings                 # shows active org's learnings
+```
+
+No flags needed. Override per-run with `--team <id>` or `--solo` when you need a different team for one task.
+
+Use `fleet sync` manually only when you want to update agents without running a task — e.g., after hiring a new role or changing a team.
+
+---
+
+## Concepts
+
+### Projects
+
+A project is the institutional memory of a codebase. Three things make your org smarter about *this specific system*:
+
+- **Context** — architecture, domain glossary, system boundaries. You write this once.
+- **Knowledge** — learnings accumulated from running tasks. Grows automatically with every run.
+- **Skills** — procedures specific to this codebase. Just create a `SKILL.md` in the project's `skills/` directory.
+
+```bash
+fleet project create my-api               # create (records cwd as repo path)
+fleet project create my-api --path ~/git/my-api  # or specify the path
+fleet project use my-api                  # activate
+fleet project clear                       # deactivate (one-off mode)
+fleet project list                        # list all
+fleet project                             # show active
+```
+
+**Multi-repo projects:** a project can span multiple repositories.
+
+```bash
+fleet project use payments
+fleet project add-repo ~/git/billing-service
+fleet project add-repo ~/git/shared-types
+```
+
+Creating a project scaffolds:
+
+```
+~/.agent-org/projects/my-api/
+  project.yaml              ← repo paths
+  context/
+    architecture.md         ← how the system is structured
+    domain-glossary.md      ← terms your team should know
+  commands/
+    build-test-lint.md      ← what the developer/tester should run
+  runbooks/
+    common-failures.md      ← known issues and workarounds
+  skills/                   ← project-specific procedures (SKILL.md files)
+  knowledge/
+    learnings.md            ← accumulated from runs (auto-updated)
+  tasks/                    ← task specs + run history
+```
+
+**Projects are opt-in.** No project active = one-off mode, no project context. Activate one and everything flows.
+
+### What your org knows during a run
+
+```
+┌──────────────────────────────────────────────┐
+│  Project skills      deploy, run-migrations  │  ← this codebase's playbooks
+│  Project knowledge   "auth middleware is..."  │  ← learned from past runs here
+│  Project context     architecture, glossary   │  ← you wrote this once
+├──────────────────────────────────────────────┤
+│  Org knowledge       cross-project patterns   │  ← learned across all projects
+│  Role knowledge      role-specific patterns   │  ← learned for this role
+│  Role skills         code-review, research    │  ← assigned org-wide skills
+│  Role definition     mission, exit criteria   │  ← the persona itself
+└──────────────────────────────────────────────┘
+```
+
+Switch projects, and the bottom layers stay — the roles bring their general expertise. The top layers change to the memory of *that* codebase.
+
+### Roles
+
+A role defines what an agent does — mission, required inputs, exit criteria, skills.
+
+```bash
+fleet hire content-editor                 # create
+fleet adopt persona architect             # copy starter for customization
+fleet inspect architect                   # view details + knowledge
+```
+
+19 starter roles across software, content, strategy, research, ops, and docs.
+
+### Teams
+
+A dependency graph of roles with quality gates. Roles with the same dependencies run in parallel.
+
+```bash
+fleet team content-pipeline
+```
+
+```yaml
+team_id: content-pipeline
+roles:
+  - id: researcher
+  - id: writer
+    depends_on: [researcher]
+  - id: editor
+    depends_on: [writer]
+  - id: fact-checker
+    depends_on: [writer]       # editor + fact-checker run in parallel
+gates:
+  reviewer_required: true
+  tester_required: false
+```
+
+6 starter teams. Flat `personas:` lists (no `depends_on`) still work — they're treated as sequential.
+
+### Skills
+
+Reusable procedural knowledge — how to do code review, risk assessment, research, etc.
+
+```bash
+fleet skill                              # list
+fleet skill add architect risk-assessment
+fleet skill create api-design
+```
+
+4 starters: `code-review`, `research`, `risk-assessment`, `fact-checking`.
+
+Project-specific skills go in the project's `skills/` directory as `SKILL.md` files — they're automatically available to all roles when that project is active.
+
+### Intelligence loop
+
+After each run, reflection analyzes what worked and what didn't:
+
+```
+Task executes → output saved
+  → Reflection analyzes the run
+  → Role learnings    → the role gets smarter at its job
+  → Project learnings → this codebase's institutional memory grows
+  → Org learnings     → cross-project patterns accumulate
+  → Role levels updated (starter → practiced → experienced → expert)
+  → Next run includes all new knowledge
+```
+
+| Layer | What it captures | Example |
+|-------|-----------------|---------|
+| **Role** | Role-specific patterns | "Validate inputs before handoff" |
+| **Project** | Codebase-specific patterns | "Auth middleware has a race condition under load" |
+| **Org** | Cross-project patterns | "Vague tasks produce worse output" |
+
+Reflection behavior is configurable:
+
+```bash
+fleet config set reflection auto           # default — automatic after every run
+fleet config set reflection review         # show learnings for approval before saving
+fleet config set reflection off            # no automatic reflection
+```
+
+### Backends
+
+Fleet defines the org. The backend runs it. `fleet run` syncs agents and then **hands off to the backend** — fleet doesn't stay in the middle.
+
+```bash
+fleet backend                              # show active
+fleet backend use copilot                  # switch
+fleet backends                             # list all + install status
+```
+
+| Backend | Agents written to | How `fleet run` executes |
+|---------|------------------|--------------------------|
+| **Claude Code** | `~/.claude/agents/fleet-*.md` | `claude --agent fleet-{team}-lead "task"` |
+| **Cursor** | `~/.cursor/agents/fleet-*.md` | `cursor --chat` with team prompt |
+| **Copilot** | `~/.squad/` | `squad run` or `copilot -p` |
+
+For Claude Code, `fleet run` launches Claude Code interactively with the team lead agent. The lead spawns subagents (one per role), manages handoffs, runs stages in parallel, and produces the final result. You see everything live in your terminal.
+
+Agents are named `fleet-{role}.md` by default. Team leads are `fleet-{team}-lead.md`. If you use multiple orgs, named orgs get `fleet-{org}-{role}.md` to avoid collisions.
+
+### Settings
+
+```bash
+fleet config                               # view all
+fleet config set default_team strategy-analysis
+fleet config set reflection review         # auto, review, or off
+```
+
+---
+
+## Starter teams
+
+| Team | Roles | Parallel stages | Domain |
+|------|-------|----------------|--------|
+| `product-delivery` | PM → Architect → Developer → Tester + Reviewer | Tester & Reviewer | Software |
+| `content-production` | Researcher → Writer → Editor + Fact Checker | Editor & Fact Checker | Content |
+| `strategy-analysis` | Analyst → Strategist → Critic → Decision Maker | | Strategy |
+| `research-synthesis` | Question Framer → Researcher → Synthesizer → Critic | | Research |
+| `incident-response` | Triager → Root Cause → Resolution Drafter → Reviewer | | Ops |
+| `docs-enablement` | PM → Developer → Docs Reviewer | | Docs |
+
+---
+
+## CLI reference
+
+```
+Setup:
+  fleet init                                 First-time setup
+  fleet config                               View settings
+  fleet config set <key> <value>             Change a setting
+
+Context:
+  fleet context                              Show all active context
+  fleet context set <key> <value>            Set team, backend, project, reflection, org
+  fleet context clear <key>                  Clear project or org
+
+Projects:
+  fleet project create <id> [--path <dir>]   Create a project
+  fleet project task <name>                  Scaffold a task spec
+  fleet project add-repo <path>              Add a repo to active project
+  fleet project list                         List all projects
+
+Status:
+  fleet                                      Show org status + active context
+  fleet org roles                            List roles
+  fleet org teams                            List teams
+  fleet org history                          View recent runs
+  fleet inspect <role>                       Role details + knowledge
+  fleet learnings                            What your org has learned
+  fleet backends                             List all backends + install status
+
+Run:
+  fleet run <task>                           Execute via active backend
+  fleet run --team <id> <task>               Through a specific team
+  fleet run --solo <task>                    Single-role
+  fleet run path/to/task.md                  From file
+  fleet run --prompt <task>                  Output prompt without executing
+  fleet summon <role> <task>                 Ask one role
+
+Build:
+  fleet hire <id>                            Create role
+  fleet team <id>                            Create team
+  fleet adopt <persona|team|skill> <id>      Copy starter to customize
+  fleet contribute <persona|team|skill> <id> Copy to repo to share
+
+Skills:
+  fleet skill                                List org skills
+  fleet skill add <role> <skill>             Assign to role
+  fleet skill remove <role> <skill>          Remove from role
+  fleet skill create <id>                    Create org skill
+
+Sync:
+  fleet sync                                 Sync to active backend
+  fleet sync <team>                          Sync specific team
+
+Reflect:
+  fleet reflect                              Reflect and apply learnings
+  fleet reflect --write-back                 Force write-back regardless of mode
+  fleet reflect --prompt                     Output reflection prompt only
+
+Advanced:
+  fleet org use <name>                       Switch to a named org
+  fleet org default                          Switch back to default org
+  fleet org list                             List all orgs
+```
+
+---
+
+## Where things live
+
+| What | Where |
+|------|-------|
+| Framework | `agentorg/` |
+| Starters | `agentorg/starters/` |
+| Settings | `~/.agent-org/settings.yaml` |
+| Org data | `~/.agent-org/` (default) or `~/.agent-org/orgs/<name>/` |
+| Claude agents | `~/.claude/agents/fleet-*.md` |
+| Cursor agents | `~/.cursor/agents/fleet-*.md` |
+| Copilot squad | `~/.squad/` |
+
+Inside each org:
+
+| What | Path |
+|------|------|
+| Roles | `personas/<id>/persona.md` |
+| Teams | `teams/<id>.yaml` |
+| Skills | `skills/<id>/SKILL.md` |
+| Knowledge | `knowledge/` |
+| Runs (one-off) | `runs/` |
+| Projects | `projects/<id>/` |
+
+Inside each project:
+
+| What | Path |
+|------|------|
+| Repo paths | `project.yaml` |
+| Architecture, glossary | `context/` |
+| Build/test/lint commands | `commands/` |
+| Known issues, workarounds | `runbooks/` |
+| Project-specific procedures | `skills/<id>/SKILL.md` |
+| Accumulated learnings | `knowledge/learnings.md` |
+| Task specs + run output | `tasks/` |
+
+---
+
+## Development
+
+```bash
+git clone https://github.com/codevj/AgentOrg.git && cd AgentOrg && uv sync
+
+uv run pytest                    # all 181 tests (<0.5s)
+uv run pytest tests/unit/        # domain + services
+uv run pytest tests/e2e/         # CLI + mock exec loop
+```
+
+## Architecture
+
+```
+agentorg/
+  domain/       Pure logic, zero I/O
+  ports/        Protocol interfaces
+  services/     Orchestration
+  adapters/     Filesystem, backends, Jinja2 rendering
+  cli/          Click commands
+  starters/     Ships with package (read-only)
+```
+
+## Contributing
+
+1. Fork, branch, make changes, add tests, `uv run pytest`
+2. Keep layers clean: domain → ports → services → adapters → CLI
+3. PR

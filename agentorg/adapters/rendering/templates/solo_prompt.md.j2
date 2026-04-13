@@ -1,0 +1,61 @@
+You are executing a solo workflow. Complete the task below by following these steps in order.
+
+## Workflow
+
+1. Read and understand the task spec
+2. Implement scoped changes — only touch what the task requires
+3. Run all validation commands and verify they pass
+4. Produce a run summary (format below)
+
+## Rules
+
+- Do not modify files outside the task scope
+- Do not skip validation commands
+- If validation fails, fix the issue and re-validate before summarizing
+
+{% if project_context %}
+## Project Context
+
+{{ project_context }}
+{% endif %}
+{% if project_commands %}
+## Project Commands
+
+{{ project_commands }}
+{% endif %}
+{% if project_runbooks %}
+## Project Runbooks
+
+{{ project_runbooks }}
+{% endif %}
+{% if project_knowledge %}
+## Project Knowledge
+
+These are learnings from previous runs in this project:
+
+{{ project_knowledge }}
+{% endif %}
+{% if project_skills %}
+## Project Skills
+
+These procedures are specific to this project:
+
+{{ project_skills }}
+{% endif %}
+
+## Task
+
+{{ task }}
+
+## Run Summary Format
+
+When complete, output a summary with these sections:
+
+```
+## Run Summary
+- **Mode**: solo
+- **Changed files**: list each file modified
+- **Validation results**: pass/fail for each command with output
+- **Residual risks**: anything the user should know
+- **Next actions**: follow-ups if any
+```

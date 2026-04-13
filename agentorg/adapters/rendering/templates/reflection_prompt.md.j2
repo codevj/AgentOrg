@@ -1,0 +1,138 @@
+You are performing a reflection cycle for an AI organization. Your job is to analyze recent run outputs and extract learnings that will make the organization smarter over time.
+
+## How Reflection Works
+
+1. Read the run history below
+2. For each role involved, identify:
+   - What worked well (patterns that produced clean handoffs)
+   - What got flagged by downstream roles (issues the next role found)
+   - Recurring patterns (domain-specific knowledge that keeps coming up)
+   - Refined criteria (exit criteria that should be tightened or loosened based on evidence)
+3. Output structured learnings in the required format below
+
+## Roles in This Org
+
+{% for role in roles %}
+### {{ role.id }}
+{{ role.content }}
+{% if role.knowledge %}
+
+#### Current Knowledge
+{{ role.knowledge }}
+{% endif %}
+
+{% endfor %}
+
+## Run History
+
+{% for run in runs %}
+---
+
+{{ run }}
+
+{% endfor %}
+
+{% if run_count %}({{ run_count }} recent runs analyzed){% endif %}
+{% if project_id %}
+
+## Project Context
+
+This run was executed in the context of project **{{ project_id }}**.
+{% if project_context %}
+
+{{ project_context }}
+{% endif %}
+{% if project_knowledge %}
+
+### Existing Project Knowledge
+
+{{ project_knowledge }}
+{% endif %}
+{% endif %}
+
+## Instructions
+
+1. Analyze each run for patterns across roles
+2. Identify what each role can learn from downstream feedback
+3. Look for recurring issues that suggest a process change
+4. Suggest specific, actionable updates to role exit criteria or knowledge
+5. If a role has no actionable learnings from these runs, skip it entirely
+6. Focus on insights that will improve future runs, not just describe past ones
+7. Do NOT repeat learnings already present in a role's Current Knowledge section
+
+Be specific. "Improve testing" is not actionable. "Add edge case validation for empty inputs before handoff, because the reviewer flagged this in 3 of 5 runs" is actionable.
+
+## CRITICAL: Output Format
+
+Your output will be parsed by a script. You MUST use this exact delimited format.
+
+### Per-role learnings
+
+For each role that has NEW actionable learnings (skip roles with nothing new):
+
+```
+===LEARNING:<role-id>===
+- [specific, actionable learning from this run]
+- [another learning — must be concrete enough to change future behavior]
+===END===
+```
+
+### Org-wide learnings
+
+Cross-role patterns and process insights:
+
+```
+===ORG_LEARNING===
+- [cross-role pattern or process insight]
+===END===
+```
+
+If there are no org-wide learnings, omit this block entirely.
+
+### Team learnings
+
+If this run was a team execution, capture how the team worked together:
+
+```
+===TEAM_LEARNING:<team-id>===
+- [team dynamic or handoff pattern — not about individual roles, but how roles interacted]
+===END===
+```
+
+If this was a solo run or there are no team-level insights, omit this block.
+{% if project_id %}
+
+### Project learnings
+
+If the run was in a project context, capture project-specific learnings:
+
+```
+===PROJECT_LEARNING:{{ project_id }}===
+- [codebase-specific pattern or insight]
+===END===
+```
+
+If there are no project-specific learnings, omit this block.
+{% endif %}
+
+### Level assessment
+
+For each role that participated, assess its current maturity:
+
+```
+===LEVEL:<role-id>=<level>===
+```
+
+Level criteria:
+- **starter**: No meaningful learnings accumulated yet
+- **practiced**: Has specific, actionable learnings from real runs
+- **experienced**: Shows adaptation — learnings reference feedback from other roles, behavior has evolved
+- **expert**: Deep domain patterns, anticipates issues before they occur, cross-role awareness
+
+### Rules
+
+- Use the exact role-id directory name (e.g., "developer", "code-reviewer", "program-manager")
+- Each learning MUST be specific enough to change future behavior
+- Do NOT output empty LEARNING blocks — skip roles with nothing actionable
+- Do NOT repeat learnings already in the role's Current Knowledge
+- LEVEL lines go outside the LEARNING blocks, one per role

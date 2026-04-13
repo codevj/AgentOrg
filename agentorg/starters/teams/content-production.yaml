@@ -1,0 +1,17 @@
+team_id: content-production
+mode_default: team
+roles:
+  - id: researcher
+  - id: writer
+    depends_on: [researcher]
+  - id: editor
+    depends_on: [writer]
+  - id: fact-checker
+    depends_on: [writer]
+gates:
+  reviewer_required: true
+  tester_required: true
+budget:
+  max_calls: 10
+  reflection: true
+  interactions: 2

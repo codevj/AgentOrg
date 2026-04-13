@@ -1,7 +1,27 @@
-projects/*
-!projects/README.md
-!projects/_template/
-!projects/_template/**
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Tools
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# AI tool generated output (from fleet sync)
+.claude/
+.squad/
+.cursor/
+
+# OS
 .DS_Store
+
+# IDE
 .idea/
 .vscode/
+
+# AgentOrg runtime (old shell artifacts)
+.tmp/

@@ -1,0 +1,15 @@
+team_id: docs-enablement
+mode_default: team
+roles:
+  - id: program-manager
+  - id: developer
+    depends_on: [program-manager]
+  - id: docs-reviewer
+    depends_on: [developer]
+gates:
+  reviewer_required: true
+  tester_required: false
+budget:
+  max_calls: 8
+  reflection: true
+  interactions: 2

@@ -1,0 +1,17 @@
+team_id: strategy-analysis
+mode_default: team
+roles:
+  - id: analyst
+  - id: strategist
+    depends_on: [analyst]
+  - id: critic
+    depends_on: [strategist]
+  - id: decision-maker
+    depends_on: [strategist, critic]
+gates:
+  reviewer_required: true
+  tester_required: false
+budget:
+  max_calls: 10
+  reflection: true
+  interactions: 3

@@ -1,0 +1,17 @@
+team_id: research-synthesis
+mode_default: team
+roles:
+  - id: question-framer
+  - id: researcher
+    depends_on: [question-framer]
+  - id: synthesizer
+    depends_on: [researcher]
+  - id: critic
+    depends_on: [synthesizer]
+gates:
+  reviewer_required: true
+  tester_required: false
+budget:
+  max_calls: 10
+  reflection: true
+  interactions: 3

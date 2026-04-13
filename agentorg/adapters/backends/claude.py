@@ -1,0 +1,194 @@
+"""Claude Code backend — sync to ~/.claude/agents/, execute via claude --print."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from agentorg.domain.knowledge import has_content, strip_placeholders
+from agentorg.ports.backend import BackendInfo
+from agentorg.ports.executor import CLIExecutor
+from agentorg.ports.knowledge_store import KnowledgeStore
+from agentorg.ports.renderer import TemplateRenderer
+from agentorg.ports.repository import PersonaRepository, SkillRepository, TeamRepository
+
+
+class ClaudeBackend:
+    def __init__(
+        self,
+        *,
+        org_name: str,
+        persona_repo: PersonaRepository,
+        team_repo: TeamRepository,
+        skill_repo: SkillRepository,
+        knowledge_store: KnowledgeStore,
+        renderer: TemplateRenderer,
+        executor: CLIExecutor,
+        contracts_dir: Path,
+    ) -> None:
+        self._agent_dir = Path.home() / ".claude" / "agents"
+        self._org_name = org_name
+        self._personas = persona_repo
+        self._teams = team_repo
+        self._skills = skill_repo
+        self._knowledge = knowledge_store
+        self._renderer = renderer
+        self._executor = executor
+        self._contracts_dir = contracts_dir
+
+    def _prefix(self) -> str:
+        """'fleet-' for default org, 'fleet-{org}-' for named orgs."""
+        if self._org_name == "default":
+            return "fleet-"
+        return f"fleet-{self._org_name}-"
+
+    def _agent_filename(self, persona_id: str) -> str:
+        return f"{self._prefix()}{persona_id}.md"
+
+    def _lead_filename(self, team_id: str) -> str:
+        return f"{self._prefix()}{team_id}-lead.md"
+
+    def _cleanup_stale(self, keep: set[str]) -> None:
+        """Remove old fleet agents for this org that are no longer needed."""
+        prefix = self._prefix()
+        if not self._agent_dir.is_dir():
+            return
+        for f in self._agent_dir.iterdir():
+            if f.name.startswith(prefix) and f.name.endswith(".md") and f.name not in keep:
+                f.unlink()
+
+    def info(self) -> BackendInfo:
+        return BackendInfo(
+            name="claude",
+            cli="claude",
+            installed=self._executor.is_installed("claude"),
+            description="Claude Code — native agent teams",
+            agent_dir=str(self._agent_dir),
+        )
+
+    def sync(self, team_id: str | None = None, **kwargs) -> int:
+        self._agent_dir.mkdir(parents=True, exist_ok=True)
+        synced = 0
+        keep: set[str] = set()
+
+        # Determine which personas to sync
+        if team_id:
+            team = self._teams.get(team_id)
+            if team is None:
+                raise ValueError(f"Team not found: {team_id}")
+            persona_ids = team.persona_ids
+        else:
+            persona_ids = self._personas.list_ids()
+
+        # Read handoff contract
+        contract_file = self._contracts_dir / "handoff-schema.md"
+        handoff_contract = contract_file.read_text() if contract_file.is_file() else ""
+
+        # Generate agent definitions
+        for pid in persona_ids:
+            persona = self._personas.get(pid)
+            if persona is None:
+                continue
+
+            learnings = self._knowledge.persona_learnings(pid)
+            knowledge_text = strip_placeholders(learnings) if has_content(learnings) else ""
+
+            skill_texts = []
+            for sid in persona.skill_ids:
+                skill = self._skills.get(sid)
+                if skill:
+                    skill_texts.append(skill.body)
+
+            content = self._renderer.render("claude_agent.md.j2", {
+                "persona_id": pid,
+                "mission": persona.mission,
+                "persona_content": persona.raw_content,
+                "knowledge": knowledge_text,
+                "skills": "\n\n".join(skill_texts),
+                "handoff_contract": handoff_contract,
+            })
+
+            filename = self._agent_filename(pid)
+            (self._agent_dir / filename).write_text(content)
+            keep.add(filename)
+            synced += 1
+
+        # Generate fleet-lead for team mode
+        if team_id:
+            team = self._teams.get(team_id)
+            if team:
+                self._generate_lead(team)
+                keep.add(self._lead_filename(team.id))
+                synced += 1
+
+        # Generate fleet-helper (always present, not org-namespaced)
+        helper_content = self._renderer.render("claude_helper.md.j2", {})
+        (self._agent_dir / "fleet-fleethelper.md").write_text(helper_content)
+        keep.add("fleet-fleethelper.md")
+        synced += 1
+
+        # Clean up stale agents from this org
+        self._cleanup_stale(keep)
+
+        return synced
+
+    def prompt(self, text: str) -> str:
+        """Raw LLM call — no sync, no agent. Used by fleet ask."""
+        if not self._executor.is_installed("claude"):
+            raise RuntimeError("'claude' CLI not found")
+        result = self._executor.run("claude -p", input_text=text)
+        if not result.success:
+            raise RuntimeError(f"Claude execution failed: {result.stderr}")
+        return result.stdout
+
+    def execute(self, team_id: str, task: str, run_id: str) -> str:
+        """Sync agents and launch the team lead agent interactively via Claude Code.
+
+        Hands off control to Claude Code — the user sees live output.
+        Returns empty string since output goes directly to terminal.
+        """
+        self.sync(team_id)
+        if not self._executor.is_installed("claude"):
+            raise RuntimeError("'claude' CLI not found")
+        lead = self._lead_filename(team_id).removesuffix(".md")
+        exit_code = self._executor.run_interactive(
+            f'claude --agent {lead} "{self._escape(task)}"'
+        )
+        if exit_code != 0:
+            raise RuntimeError(f"Claude Code exited with code {exit_code}")
+        return ""
+
+    @staticmethod
+    def _escape(text: str) -> str:
+        return text.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`")
+
+    def _generate_lead(self, team) -> None:
+        # Build role info with dependency data
+        specs_by_id = {rs.id: rs for rs in team.role_specs}
+        roles = []
+        for pid in team.persona_ids:
+            persona = self._personas.get(pid)
+            if persona:
+                spec = specs_by_id.get(pid)
+                roles.append({
+                    "id": pid,
+                    "mission": persona.mission,
+                    "depends_on": spec.depends_on if spec else [],
+                })
+
+        org_raw = self._knowledge.org_learnings()
+        org_text = strip_placeholders(org_raw) if has_content(org_raw) else ""
+
+        team_raw = self._knowledge.team_learnings(team.id)
+        team_text = strip_placeholders(team_raw) if has_content(team_raw) else ""
+
+        content = self._renderer.render("claude_lead.md.j2", {
+            "team_id": team.id,
+            "governance_profile": team.governance_profile,
+            "governance_rules": [],
+            "roles": roles,
+            "stages": team.execution_stages(),
+            "team_learnings": team_text,
+            "org_learnings": org_text,
+        })
+
+        (self._agent_dir / self._lead_filename(team.id)).write_text(content)

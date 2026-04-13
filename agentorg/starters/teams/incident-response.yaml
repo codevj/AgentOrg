@@ -1,0 +1,17 @@
+team_id: incident-response
+mode_default: team
+roles:
+  - id: triager
+  - id: root-cause-analyst
+    depends_on: [triager]
+  - id: resolution-drafter
+    depends_on: [root-cause-analyst]
+  - id: code-reviewer
+    depends_on: [resolution-drafter]
+gates:
+  reviewer_required: true
+  tester_required: true
+budget:
+  max_calls: 10
+  reflection: true
+  interactions: 2

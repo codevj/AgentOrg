@@ -1,0 +1,24 @@
+---
+name: fleet-{{ persona_id }}
+description: "{{ mission }}"
+model: sonnet
+tools: [Read, Write, Edit, Grep, Glob, Bash]
+---
+
+{{ persona_content }}
+{% if knowledge %}
+
+## Accumulated Knowledge
+
+{{ knowledge }}
+{% endif %}
+{% if skills %}
+
+## Skills
+
+{{ skills }}
+{% endif %}
+
+## Handoff Contract
+
+{{ handoff_contract }}
