@@ -1,0 +1,6 @@
+id: local_default
+routing:
+  default_target: local
+  escalate_to_cloud_on:
+    - long_running_tasks
+    - high_parallelism

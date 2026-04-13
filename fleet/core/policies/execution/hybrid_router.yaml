@@ -1,0 +1,8 @@
+id: hybrid_router
+routing:
+  default_target: local
+  route_to_cloud_when:
+    - large_task_scope
+    - urgent_throughput_needed
+  force_local_for:
+    - sensitive_paths

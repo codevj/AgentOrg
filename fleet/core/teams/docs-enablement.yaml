@@ -1,0 +1,11 @@
+team_id: docs-enablement
+mode_default: team
+personas:
+  - program-manager
+  - developer
+  - docs-reviewer
+governance_profile: quality_first
+execution_profile: local_default
+gates:
+  reviewer_required: true
+  tester_required: false

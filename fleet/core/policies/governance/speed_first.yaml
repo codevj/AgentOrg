@@ -1,0 +1,7 @@
+id: speed_first
+rules:
+  - parallelize_low_risk_work
+  - minimize_iteration_overhead
+gates:
+  reviewer_required: false
+  tester_required: true

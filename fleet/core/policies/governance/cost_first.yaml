@@ -1,0 +1,7 @@
+id: cost_first
+rules:
+  - prefer_local_execution
+  - limit_parallel_cloud_agents
+gates:
+  reviewer_required: true
+  tester_required: true

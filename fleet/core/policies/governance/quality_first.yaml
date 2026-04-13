@@ -1,0 +1,7 @@
+id: quality_first
+rules:
+  - strict_handoff_schema
+  - reviewer_loop_until_clean
+gates:
+  reviewer_required: true
+  tester_required: true

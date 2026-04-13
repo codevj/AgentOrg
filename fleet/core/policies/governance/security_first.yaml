@@ -1,0 +1,7 @@
+id: security_first
+rules:
+  - secret_safe_boundaries
+  - local_only_sensitive_data
+gates:
+  reviewer_required: true
+  tester_required: true

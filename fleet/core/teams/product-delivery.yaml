@@ -1,0 +1,13 @@
+team_id: product-delivery
+mode_default: team
+personas:
+  - program-manager
+  - architect
+  - developer
+  - tester
+  - code-reviewer
+governance_profile: quality_first
+execution_profile: local_default
+gates:
+  reviewer_required: true
+  tester_required: true

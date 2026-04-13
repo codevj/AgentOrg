@@ -1,0 +1,6 @@
+id: cloud_default
+routing:
+  default_target: cloud
+  force_local_for:
+    - sensitive_paths
+    - local_system_dependencies
