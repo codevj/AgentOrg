@@ -11,7 +11,7 @@ AgentOrg is a workflow-first system for orchestrating single-agent and multi-age
 - `fleet/examples/` - runnable solo/team examples
 - `fleet/scripts/` - prompt generation and config validation helpers
 - `fleet/ux/` - cross-platform product and config model docs
-- `projects/` - per-project overlays with context, commands, tasks, and runbooks
+- `projects/` - committed template for local per-project overlays
 
 ## First run
 
@@ -22,7 +22,7 @@ fleet/scripts/quick-task.sh team product-delivery "Your task title"
 Start from your own task with automatic team validation:
 
 ```bash
-fleet/scripts/start-task.sh team product-delivery projects/my-project/tasks/feature-start.md
+fleet/scripts/start-task.sh team product-delivery ~/.agent-org/projects/my-project/tasks/feature-start.md
 ```
 
 Create reusable team/persona:
@@ -37,7 +37,7 @@ Or full project workflow:
 ```bash
 fleet/scripts/new-project.sh my-project
 
-fleet/scripts/start-task.sh team product-delivery projects/my-project/tasks/feature-start.md
+fleet/scripts/start-task.sh team product-delivery ~/.agent-org/projects/my-project/tasks/feature-start.md
 ```
 
 ## Vision

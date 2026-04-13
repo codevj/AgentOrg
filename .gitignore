@@ -1,0 +1,4 @@
+projects/*
+!projects/README.md
+!projects/_template/
+!projects/_template/**

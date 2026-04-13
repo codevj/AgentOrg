@@ -15,7 +15,7 @@ AgentOrg Fleet is a workflow system for running single-agent and multi-agent tea
 - `examples/` - runnable task workflows
 - `scripts/` - prompt generation and config helpers
 - `ux/` - product contracts for future cross-platform interfaces
-- `../projects/` - per-project overlays and task starter packs
+- `../projects/` - committed template for local project overlays
 
 ## Quick start
 
@@ -25,7 +25,7 @@ fleet/scripts/new-project.sh my-project
 fleet/scripts/generate-run-prompt.sh \
   --mode team \
   --team product-delivery \
-  --task projects/my-project/tasks/feature-start.md
+  --task ~/.agent-org/projects/my-project/tasks/feature-start.md
 ```
 
 ## Important docs
