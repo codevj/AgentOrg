@@ -1,6 +1,6 @@
 # AgentOrg
 
-Build AI organizations that learn. Multiple orgs, multiple projects, multiple teams — each getting smarter with every task.
+Build AI organizations that do your work — and get smarter every time they do it. Multiple orgs, multiple projects, multiple teams.
 
 <p align="center">
   <img src="images/agentorg-overview.svg" alt="AgentOrg — teams, projects, intelligence loop, backends" width="850"/>
