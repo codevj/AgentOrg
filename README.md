@@ -1,12 +1,36 @@
 # AgentOrg
 
-Turn Claude Code, Cursor, or Copilot into a team that reviews its own work, enforces quality gates, and gets smarter with every task.
+Build AI organizations that learn. Multiple orgs, multiple projects, multiple teams — each getting smarter with every task.
+
+<p align="center">
+  <img src="images/agentorg-overview.svg" alt="AgentOrg — teams, projects, intelligence loop, backends" width="850"/>
+</p>
+
+```bash
+fleet run "Add rate limiting to the API"
+```
+
+A PM scopes it. An architect designs it. A developer builds it. A tester and reviewer check it — in parallel. Each role hands off structured artifacts to the next. Quality gates block bad work. And the whole org learns from every run.
 
 ## Why
 
-AI coding assistants give you one shot — one perspective, no review, no structure. Simple tasks work fine. But anything with real stakes benefits from more than one pass and more than one point of view.
+You wouldn't ship code that only one person looked at. Why accept that from AI?
 
-AgentOrg lets you define an organization — roles, teams, handoff contracts, quality gates — and sync it to the AI assistant you already use. Each role becomes a real agent. A PM scopes the work. An architect designs it. A developer builds it. A tester validates it. A reviewer checks it. They hand off structured artifacts to each other. And the whole org learns from every run.
+One agent gives you one shot. AgentOrg gives you an organization — roles that plan, build, test, and review each other's work. The reviewer catches what the developer missed. The tester finds edge cases the architect didn't anticipate. Quality gates block bad work from moving forward.
+
+And your org remembers. Every run teaches it something. Your architect learns your codebase. Your reviewer learns your common mistakes. Learnings condense over time — signal stays, noise goes. Run 20 is better than run 1, automatically.
+
+Define your org once. Use it everywhere — Claude Code, Cursor, or Copilot.
+
+- **Multiple perspectives** — an architect catches what a developer misses
+- **Quality gates** — a reviewer blocks bad code before it ships
+- **Institutional memory** — learnings from past runs make future runs better
+- **Parallel execution** — independent roles run simultaneously, not sequentially
+- **Different work, different teams** — product delivery for features, strategy analysis for decisions, content production for writing. Switch with one command.
+- **Projects remember your codebase** — architecture, build commands, domain terms, failure modes. Fill in once, every task in that project gets the context automatically.
+- **Skills are reusable** — code review, risk assessment, deployment procedures. Assign them to roles or keep them project-specific.
+- **Personal and work, separated** — multiple orgs with their own roles, knowledge, and history. Your side project doesn't mix with your day job.
+- **One command** — `fleet run` handles everything. You watch the team work.
 
 ## Install
 
@@ -49,7 +73,7 @@ Next:
 fleet run "Add a /health endpoint"
 ```
 
-That's it. `fleet run` uses your default team and backend, syncs agents automatically, and executes. Override the team per-run with `--team <id>`, or change the default with `fleet context set team <id>` — see [Context switches](#context-switches). For Claude Code, agents land in `~/.claude/agents/` — available in every project you open.
+That's it. `fleet run` uses your default team and backend, syncs agents automatically, and executes. Override the team per-run with `--team <id>`, or change the default with `fleet config set team <id>` — see [Context switches](#context-switches). For Claude Code, agents land in `~/.claude/agents/` — available in every project you open.
 
 After the run, `fleet` shows your current context:
 
@@ -213,26 +237,29 @@ Each role produces a structured **handoff** before the next stage starts. Qualit
 
 ## Context switches
 
-`fleet context` shows and changes everything that affects how `fleet run` behaves:
+`fleet config` shows and changes everything that affects how `fleet run` behaves:
 
 ```bash
-fleet context                          # show current context
+fleet config                               # show current config and context
 ```
 
 ```
-  team:       product-delivery
-  backend:    claude
-  project:    my-api
-  reflection: auto
-  org:        default
+  team:              product-delivery
+  backend:           claude
+  project:           my-api
+  org:               default
+  reflection:        auto
+  condense_after:    5
+  org_home:          ~/.agent-org
 ```
 
 ```bash
-fleet context set team strategy-analysis   # switch team
-fleet context set backend cursor           # switch backend
-fleet context set project my-api           # switch project
-fleet context set reflection review        # switch reflection mode
-fleet context clear project                # deactivate project (one-off mode)
+fleet config set team strategy-analysis    # switch team
+fleet config set backend cursor            # switch backend
+fleet config set project my-api            # switch project
+fleet config set reflection review         # switch reflection mode
+fleet config set condense_after 10         # condense learnings every 10 reflections
+fleet config clear project                 # deactivate project (one-off mode)
 ```
 
 Then just work:
@@ -444,9 +471,9 @@ Setup:
   fleet config set <key> <value>             Change a setting
 
 Context:
-  fleet context                              Show all active context
-  fleet context set <key> <value>            Set team, backend, project, reflection, org
-  fleet context clear <key>                  Clear project or org
+  fleet config                               Show all settings and active context
+  fleet config set <key> <value>             Set team, backend, project, reflection, org, condense_after
+  fleet config clear <key>                   Clear project or org
 
 Projects:
   fleet project create <id> [--path <dir>]   Create a project

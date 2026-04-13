@@ -79,3 +79,53 @@ def test_no_learnings_returns_none(store: FileKnowledgeStore):
     assert store.persona_learnings("nonexistent") is None
     assert store.team_learnings("nonexistent") is None
     assert store.org_learnings() is None
+
+
+# ── Condensation methods ──
+
+
+def test_persona_reflection_count_zero(store: FileKnowledgeStore):
+    """Returns 0 when no learnings file exists."""
+    assert store.persona_reflection_count("nonexistent") == 0
+
+
+def test_persona_reflection_count(store: FileKnowledgeStore):
+    store.init_persona("developer")
+    store.append_persona_learnings("developer", "\n## Reflection: 2026-04-01\n\n- A\n")
+    store.append_persona_learnings("developer", "\n## Reflection: 2026-04-02\n\n- B\n")
+    store.append_persona_learnings("developer", "\n## Reflection: 2026-04-03\n\n- C\n")
+    assert store.persona_reflection_count("developer") == 3
+
+
+def test_archive_persona_reflection(store: FileKnowledgeStore, config: Config):
+    store.init_persona("developer")
+    store.archive_persona_reflection("developer", "archived content")
+    archive_dir = config.knowledge_dir / "personas" / "developer" / "archive"
+    assert archive_dir.is_dir()
+    archives = list(archive_dir.glob("*.md"))
+    assert len(archives) == 1
+    assert "archived content" in archives[0].read_text()
+
+
+def test_condense_persona_learnings(store: FileKnowledgeStore, config: Config):
+    store.init_persona("developer")
+    store.append_persona_learnings("developer", "\n## Reflection: 2026-04-01\n\n- Old stuff\n")
+
+    store.condense_persona_learnings("developer", "- Condensed learning", "Merged old stuff")
+
+    # Learnings should be replaced
+    text = store.persona_learnings("developer")
+    assert text is not None
+    assert "Condensed learning" in text
+    assert "Old stuff" not in text
+
+    # Changelog should exist
+    changelog = config.knowledge_dir / "personas" / "developer" / "changelog.md"
+    assert changelog.is_file()
+    assert "Merged old stuff" in changelog.read_text()
+
+    # Archive should have the old content
+    archive_dir = config.knowledge_dir / "personas" / "developer" / "archive"
+    assert archive_dir.is_dir()
+    archives = list(archive_dir.glob("*.md"))
+    assert len(archives) == 1

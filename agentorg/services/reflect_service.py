@@ -5,6 +5,9 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import re
+
+from agentorg.domain.condense import build_condense_prompt
 from agentorg.domain.knowledge import has_content, strip_placeholders
 from agentorg.domain.models import ReflectionResult
 from agentorg.domain.reflection import parse_reflection_output
@@ -127,3 +130,71 @@ class ReflectService:
                         f.write(f"\n## Reflection: {today}\n\n{prl.content}\n")
 
         return result
+
+    def maybe_condense(
+        self,
+        *,
+        backend: Backend,
+        condense_after: int,
+        persona_ids: list[str] | None = None,
+    ) -> list[str]:
+        """Check each persona and condense if reflection count >= threshold.
+
+        Returns a list of persona IDs that were condensed.
+        """
+        if condense_after <= 0:
+            return []
+
+        ids = persona_ids or self._personas.list_ids()
+        condensed_ids: list[str] = []
+
+        for pid in ids:
+            count = self._knowledge.persona_reflection_count(pid)
+            if count < condense_after:
+                continue
+
+            # Get current learnings
+            learnings = self._knowledge.persona_learnings(pid)
+            if not learnings or not has_content(learnings):
+                continue
+
+            # Extract individual reflections from the learnings text
+            reflections = re.split(r"(?=^## Reflection:)", learnings, flags=re.MULTILINE)
+            new_reflections = [r.strip() for r in reflections if r.strip().startswith("## Reflection:")]
+
+            prompt = build_condense_prompt(learnings, new_reflections)
+            try:
+                output = backend.prompt(prompt)
+            except Exception:
+                continue  # condensation failure is non-fatal
+
+            # Parse output: extract Active Learnings and Changelog sections
+            condensed_text, changelog_text = _parse_condense_output(output)
+            if condensed_text:
+                self._knowledge.condense_persona_learnings(pid, condensed_text, changelog_text)
+                condensed_ids.append(pid)
+
+        return condensed_ids
+
+
+def _parse_condense_output(output: str) -> tuple[str, str]:
+    """Extract Active Learnings and Changelog sections from LLM output.
+
+    Returns (condensed_text, changelog_text). Either may be empty.
+    """
+    condensed = ""
+    changelog = ""
+
+    # Split on ## headers
+    sections = re.split(r"(?=^## )", output, flags=re.MULTILINE)
+    for section in sections:
+        stripped = section.strip()
+        if stripped.lower().startswith("## active learnings"):
+            # Everything after the header line
+            lines = stripped.split("\n", 1)
+            condensed = lines[1].strip() if len(lines) > 1 else ""
+        elif stripped.lower().startswith("## changelog"):
+            lines = stripped.split("\n", 1)
+            changelog = lines[1].strip() if len(lines) > 1 else ""
+
+    return condensed, changelog

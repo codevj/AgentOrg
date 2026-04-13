@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 580" font-family="system-ui, -apple-system, sans-serif">
+  <!-- Background -->
+  <rect width="860" height="580" rx="16" fill="#0f172a"/>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- WHY: Before vs After                    -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <!-- Before -->
+  <rect x="30" y="20" width="385" height="100" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.2"/>
+  <text x="50" y="44" fill="#ef4444" font-size="11" font-weight="800">TODAY</text>
+
+  <text x="50" y="72" fill="#e2e8f0" font-size="24">👤</text>
+  <text x="85" y="70" fill="#334155" font-size="16">→</text>
+  <text x="105" y="72" fill="#e2e8f0" font-size="24">🤖</text>
+  <text x="138" y="70" fill="#334155" font-size="16">→</text>
+  <text x="160" y="72" fill="#e2e8f0" font-size="10">first draft</text>
+
+  <text x="50" y="100" fill="#94a3b8" font-size="9">One agent. One shot. One perspective.</text>
+  <text x="250" y="100" fill="#ef4444" font-size="9" font-weight="600">No review. No memory. No structure.</text>
+
+  <!-- After -->
+  <rect x="445" y="20" width="385" height="100" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.2"/>
+  <text x="465" y="44" fill="#10b981" font-size="11" font-weight="800">WITH AGENTORG</text>
+
+  <text x="465" y="72" fill="#e2e8f0" font-size="24">👤</text>
+  <text x="500" y="70" fill="#334155" font-size="16">→</text>
+  <text x="520" y="60" fill="#e2e8f0" font-size="16">📋</text>
+  <text x="545" y="60" fill="#e2e8f0" font-size="16">🏗️</text>
+  <text x="570" y="60" fill="#e2e8f0" font-size="16">⌨️</text>
+  <text x="595" y="60" fill="#e2e8f0" font-size="16">🧪</text>
+  <text x="620" y="60" fill="#e2e8f0" font-size="16">🔍</text>
+  <text x="648" y="70" fill="#334155" font-size="16">→</text>
+  <text x="668" y="72" fill="#10b981" font-size="10" font-weight="700">reviewed, tested,</text>
+  <text x="668" y="86" fill="#10b981" font-size="10" font-weight="700">validated result</text>
+
+  <text x="465" y="100" fill="#94a3b8" font-size="9">A whole team. Quality gates. Structured handoffs.</text>
+  <text x="700" y="100" fill="#10b981" font-size="9" font-weight="600">Learns every run.</text>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- HOW: Teams                              -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <text x="30" y="150" fill="#e2e8f0" font-size="13" font-weight="800">HOW IT WORKS</text>
+
+  <!-- Team Section Header -->
+  <text x="30" y="175" fill="#94a3b8" font-size="10" font-weight="600">Pick a team for the job. Each team is a pipeline of roles with quality gates.</text>
+
+  <!-- Team 1: product-delivery (expanded) -->
+  <rect x="30" y="188" width="800" height="92" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+  <rect x="30" y="188" width="8" height="92" rx="4" fill="#3b82f6"/>
+
+  <text x="52" y="210" fill="#93c5fd" font-size="11" font-weight="700">🛠 product-delivery</text>
+  <text x="220" y="210" fill="#475569" font-size="9">for software features</text>
+
+  <!-- Roles as a clear pipeline -->
+  <circle cx="72" cy="245" r="18" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+  <text x="72" y="242" text-anchor="middle" fill="#e2e8f0" font-size="15">📋</text>
+  <text x="72" y="255" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="700">PM</text>
+  <text x="72" y="270" text-anchor="middle" fill="#475569" font-size="6">scopes work</text>
+
+  <line x1="95" y1="245" x2="120" y2="245" stroke="#334155" stroke-width="1.5"/>
+  <text x="107" y="242" fill="#334155" font-size="8">→</text>
+
+  <circle cx="145" cy="245" r="18" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+  <text x="145" y="242" text-anchor="middle" fill="#e2e8f0" font-size="15">🏗️</text>
+  <text x="145" y="255" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="700">Architect</text>
+  <text x="145" y="270" text-anchor="middle" fill="#475569" font-size="6">designs</text>
+
+  <line x1="168" y1="245" x2="193" y2="245" stroke="#334155" stroke-width="1.5"/>
+  <text x="180" y="242" fill="#334155" font-size="8">→</text>
+
+  <circle cx="218" cy="245" r="18" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+  <text x="218" y="242" text-anchor="middle" fill="#e2e8f0" font-size="15">⌨️</text>
+  <text x="218" y="255" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="700">Developer</text>
+  <text x="218" y="270" text-anchor="middle" fill="#475569" font-size="6">builds</text>
+
+  <line x1="241" y1="238" x2="266" y2="232" stroke="#10b981" stroke-width="1.5"/>
+  <line x1="241" y1="252" x2="266" y2="258" stroke="#10b981" stroke-width="1.5"/>
+
+  <!-- Parallel block -->
+  <rect x="268" y="218" width="115" height="55" rx="6" fill="#0a1f1a" stroke="#10b981" stroke-width="1.2"/>
+  <text x="325" y="232" text-anchor="middle" fill="#10b981" font-size="7" font-weight="700">⚡ PARALLEL</text>
+  <text x="290" y="250" fill="#e2e8f0" font-size="12">🧪</text>
+  <text x="306" y="250" fill="#6ee7b7" font-size="8" font-weight="600">Tester</text>
+  <text x="290" y="267" fill="#e2e8f0" font-size="12">🔍</text>
+  <text x="306" y="267" fill="#6ee7b7" font-size="8" font-weight="600">Reviewer</text>
+
+  <line x1="388" y1="245" x2="410" y2="245" stroke="#10b981" stroke-width="1.5"/>
+  <text x="399" y="242" fill="#10b981" font-size="8">→</text>
+
+  <rect x="415" y="232" width="30" height="28" rx="6" fill="#0a1f1a" stroke="#10b981" stroke-width="1.5"/>
+  <text x="430" y="251" text-anchor="middle" fill="#10b981" font-size="16">✓</text>
+
+  <!-- Handoff explanation -->
+  <text x="470" y="240" fill="#64748b" font-size="8">Each role produces a structured handoff.</text>
+  <text x="470" y="253" fill="#64748b" font-size="8">Quality gates block bad work from advancing.</text>
+  <text x="470" y="266" fill="#64748b" font-size="8">Independent roles run in parallel.</text>
+
+  <!-- Team 2 -->
+  <rect x="30" y="288" width="390" height="35" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
+  <rect x="30" y="288" width="8" height="35" rx="4" fill="#8b5cf6"/>
+  <text x="52" y="310" fill="#c4b5fd" font-size="10" font-weight="700">✍️ content-production</text>
+  <text x="210" y="310" fill="#475569" font-size="8">Researcher → Writer → Editor + Fact Checker ⚡</text>
+
+  <!-- Team 3 -->
+  <rect x="440" y="288" width="390" height="35" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+  <rect x="440" y="288" width="8" height="35" rx="4" fill="#f59e0b"/>
+  <text x="462" y="310" fill="#fcd34d" font-size="10" font-weight="700">📊 strategy-analysis</text>
+  <text x="620" y="310" fill="#475569" font-size="8">Analyst → Strategist → Critic → Decision Maker</text>
+
+  <text x="430" y="340" text-anchor="middle" fill="#334155" font-size="8">+ incident-response · research-synthesis · docs-enablement · build your own</text>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- HOW: Projects + Knowledge + Orgs        -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <!-- Projects -->
+  <rect x="30" y="355" width="260" height="80" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <rect x="30" y="355" width="8" height="80" rx="4" fill="#06b6d4"/>
+  <text x="52" y="378" fill="#e2e8f0" font-size="10" font-weight="700">📁 Projects</text>
+  <text x="140" y="378" fill="#475569" font-size="8">your codebase's memory</text>
+  <text x="52" y="396" fill="#67e8f9" font-size="8">architecture · domain glossary · build commands</text>
+  <text x="52" y="410" fill="#67e8f9" font-size="8">skills · knowledge · runbooks · multi-repo</text>
+  <text x="52" y="425" fill="#475569" font-size="7">context injected into every task automatically</text>
+
+  <!-- Knowledge -->
+  <rect x="305" y="355" width="260" height="80" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+  <rect x="305" y="355" width="8" height="80" rx="4" fill="#f59e0b"/>
+  <text x="327" y="378" fill="#e2e8f0" font-size="10" font-weight="700">🧠 Knowledge</text>
+  <text x="415" y="378" fill="#475569" font-size="8">three layers, auto-condensed</text>
+  <text x="327" y="396" fill="#6ee7b7" font-size="8">Project</text>
+  <text x="375" y="396" fill="#64748b" font-size="8">"auth middleware race condition"</text>
+  <text x="327" y="410" fill="#93c5fd" font-size="8">Role</text>
+  <text x="360" y="410" fill="#64748b" font-size="8">"validate inputs before handoff"</text>
+  <text x="327" y="425" fill="#fcd34d" font-size="8">Org</text>
+  <text x="355" y="425" fill="#64748b" font-size="8">"vague tasks produce worse output"</text>
+
+  <!-- Orgs -->
+  <rect x="580" y="355" width="250" height="80" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <rect x="580" y="355" width="8" height="80" rx="4" fill="#a855f7"/>
+  <text x="602" y="378" fill="#e2e8f0" font-size="10" font-weight="700">🏢 Orgs</text>
+  <text x="652" y="378" fill="#475569" font-size="8">isolated workspaces</text>
+  <text x="602" y="396" fill="#c4b5fd" font-size="8">Work org — teams, projects, knowledge</text>
+  <text x="602" y="410" fill="#c4b5fd" font-size="8">Personal org — completely separate</text>
+  <text x="602" y="425" fill="#475569" font-size="7">roles level up: starter → practiced → expert</text>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- Intelligence loop                        -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <rect x="30" y="450" width="800" height="42" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="52" y="470" fill="#fbbf24" font-size="10" font-weight="800">🔄 LEARNS</text>
+  <text x="125" y="470" fill="#fcd34d" font-size="9">Every run → reflect → role + project + org learnings → condense →</text>
+  <text x="535" y="470" fill="#e2e8f0" font-size="9" font-weight="600">signal stays, noise goes →</text>
+  <text x="695" y="470" fill="#10b981" font-size="11" font-weight="800">Run 20 > Run 1</text>
+  <text x="52" y="485" fill="#475569" font-size="7">your architect learns your codebase · your reviewer learns your mistakes · automatically</text>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- Backends                                 -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <text x="52" y="520" fill="#475569" font-size="9">Define once. Sync to</text>
+  <text x="162" y="520" fill="#93c5fd" font-size="9" font-weight="700">Claude Code</text>
+  <text x="242" y="520" fill="#334155">·</text>
+  <text x="252" y="520" fill="#c4b5fd" font-size="9" font-weight="700">Cursor</text>
+  <text x="295" y="520" fill="#334155">·</text>
+  <text x="305" y="520" fill="#6ee7b7" font-size="9" font-weight="700">Copilot</text>
+  <text x="365" y="520" fill="#475569" font-size="9">— agents run natively in your AI tool.</text>
+
+  <!-- Config -->
+  <text x="52" y="540" fill="#475569" font-size="8">fleet config — switch team · backend · project · org · reflection anytime. Or just:</text>
+  <text x="450" y="540" fill="#94a3b8" font-size="9" font-weight="600">fleet run "your task"</text>
+
+  <!-- Footer -->
+  <text x="430" y="568" text-anchor="middle" fill="#334155" font-size="10" font-weight="700">multiple orgs · multiple projects · multiple teams · all learning</text>
+</svg>

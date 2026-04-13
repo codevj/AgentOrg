@@ -160,6 +160,7 @@ class RunService:
         reflection_mode: ReflectionMode = ReflectionMode.AUTO,
         project_root: Path | None = None,
         project_id: str | None = None,
+        condense_after: int = 0,
     ) -> Run:
         """Execute a task via a backend. Returns the Run record."""
         run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -211,6 +212,16 @@ class RunService:
                 budget.record(BudgetActivity.REFLECT)
                 self._reflect.write_back(reflection_output, project_root=project_root)
                 self._runs.save_budget(run_id, budget)
+
+                # Condense if threshold reached
+                if condense_after > 0:
+                    try:
+                        self._reflect.maybe_condense(
+                            backend=backend,
+                            condense_after=condense_after,
+                        )
+                    except Exception:
+                        pass  # condensation failure is non-fatal
             except Exception:
                 pass  # reflection failure is non-fatal
 

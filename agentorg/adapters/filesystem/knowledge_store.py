@@ -5,6 +5,8 @@ All knowledge lives at ~/.agent-org/knowledge/ — outside the repo.
 
 from __future__ import annotations
 
+import re
+from datetime import date
 from pathlib import Path
 
 from agentorg.config import Config
@@ -60,6 +62,46 @@ class FileKnowledgeStore:
         level_path = self._persona_level_path(persona_id)
         if not level_path.exists():
             level_path.write_text(Level.STARTER.value)
+
+    def persona_reflection_count(self, persona_id: str) -> int:
+        """Count ``## Reflection:`` headers in the persona's learnings file."""
+        path = self._persona_learnings_path(persona_id)
+        if not path.is_file():
+            return 0
+        text = path.read_text()
+        return len(re.findall(r"^## Reflection:", text, re.MULTILINE))
+
+    def archive_persona_reflection(self, persona_id: str, content: str) -> None:
+        """Write content to knowledge/personas/{id}/archive/{date}.md."""
+        archive_dir = self._base / "personas" / persona_id / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        today = date.today().isoformat()
+        archive_path = archive_dir / f"{today}.md"
+        # Append if there's already an archive for today
+        with archive_path.open("a") as f:
+            f.write(content)
+
+    def condense_persona_learnings(
+        self, persona_id: str, condensed: str, changelog: str
+    ) -> None:
+        """Replace learnings with condensed version, archive the old one, log the changelog."""
+        learnings_path = self._persona_learnings_path(persona_id)
+
+        # Archive current learnings
+        if learnings_path.is_file():
+            old_content = learnings_path.read_text()
+            self.archive_persona_reflection(persona_id, old_content)
+
+        # Replace with condensed version
+        learnings_path.write_text(
+            f"# Learnings: {persona_id}\n\n{condensed}\n"
+        )
+
+        # Append changelog
+        changelog_path = self._base / "personas" / persona_id / "changelog.md"
+        today = date.today().isoformat()
+        with changelog_path.open("a") as f:
+            f.write(f"\n## Condensation: {today}\n\n{changelog}\n")
 
     # ── Team knowledge ──
 

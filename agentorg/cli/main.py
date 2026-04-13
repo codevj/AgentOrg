@@ -11,8 +11,10 @@ from agentorg.config import (
     Config,
     ReflectionMode,
     get_active_backend,
+    get_condense_after,
     get_reflection_mode,
     set_active_backend,
+    set_condense_after,
     set_reflection_mode,
 )
 
@@ -171,12 +173,12 @@ Common mappings:
 - "show/view/inspect role X" or "show X learnings" → fleet inspect X
 - "list roles" → fleet org roles
 - "list teams" → fleet org teams
-- "switch to X project" → fleet context set project X
-- "switch to X backend" → fleet context set backend X
-- "switch to X team" → fleet context set team X
+- "switch to X project" → fleet config set project X
+- "switch to X backend" → fleet config set backend X
+- "switch to X team" → fleet config set team X
 - "create project X" → fleet project create X
 - "run/build/implement X" → fleet run "X"
-- "show context" → fleet context
+- "show config/context" → fleet config
 - "list projects" → fleet project list
 - "create task X" → fleet project task "X"
 
@@ -324,6 +326,16 @@ def init(ctx: click.Context) -> None:
     except ValueError:
         reflection = "auto"
 
+    # Condense threshold
+    condense_after_str = click.prompt(
+        "Condense learnings after N reflections (0 = disabled)",
+        default="5",
+    )
+    try:
+        condense_after_val = int(condense_after_str)
+    except ValueError:
+        condense_after_val = 5
+
     from pathlib import Path as _Path
     new_config = Config(
         starters_dir=config.starters_dir,
@@ -333,6 +345,7 @@ def init(ctx: click.Context) -> None:
         reflection=reflection,
     )
     save_settings(new_config)
+    set_condense_after(new_config, condense_after_val)
 
     # Create directories
     new_config.org_home.mkdir(parents=True, exist_ok=True)
@@ -353,17 +366,30 @@ def init(ctx: click.Context) -> None:
 @fleet.group(invoke_without_command=True, name="config")
 @click.pass_context
 def config_cmd(ctx: click.Context) -> None:
-    """View or change settings."""
+    """View or change settings and active context."""
     if ctx.invoked_subcommand is None:
         config = ctx.obj["config"]
+        from agentorg.config import get_active_org
+
+        active_backend = get_active_backend(config)
+        proj_svc = ctx.obj["project_service"]
+        active_project = proj_svc.get_active()
+        active_org_name = get_active_org() or "default"
+        mode = get_reflection_mode(config)
+        condense = get_condense_after(config)
+
         click.echo()
         click.echo(o.bold("Settings") + "  " + o.dim(str(config.settings_file)))
         click.echo()
-        mode = get_reflection_mode(config)
-        click.echo(f"  org_home:          {config.org_home}")
-        click.echo(f"  default_backend:   {config.default_backend}")
-        click.echo(f"  default_team:      {config.default_team}")
+        click.echo(f"  team:              {o.bold(config.default_team)}")
+        click.echo(f"  backend:           {o.bold(active_backend)}")
+        project_str = o.bold(active_project.id) if active_project else o.dim("(none)")
+        click.echo(f"  project:           {project_str}")
+        org_str = o.dim(active_org_name) if active_org_name == "default" else o.bold(active_org_name)
+        click.echo(f"  org:               {org_str}")
         click.echo(f"  reflection:        {mode.value}")
+        click.echo(f"  condense_after:    {condense}")
+        click.echo(f"  org_home:          {config.org_home}")
         click.echo()
         if not config.settings_file.is_file():
             click.echo(o.dim("  No settings file yet. Run 'fleet init' to create one."))
@@ -375,18 +401,59 @@ def config_cmd(ctx: click.Context) -> None:
 @click.argument("value")
 @click.pass_context
 def config_set(ctx: click.Context, key: str, value: str) -> None:
-    """Set a configuration value."""
+    """Set a configuration value (team, backend, project, reflection, org, condense_after, org_home)."""
     from agentorg.config import save_settings
 
     config = ctx.obj["config"]
-    valid_keys = {"default_backend", "default_team", "reflection", "org_home"}
+    valid_keys = {
+        "team", "default_team", "backend", "default_backend",
+        "project", "reflection", "org", "condense_after", "org_home",
+    }
 
     if key not in valid_keys:
         click.echo(o.error(f"Unknown key: {key}. Valid: {', '.join(sorted(valid_keys))}"), err=True)
         raise SystemExit(1)
 
-    # Reflection mode has its own setter (preserves other settings)
-    if key == "reflection":
+    # team / default_team
+    if key in ("team", "default_team"):
+        # Validate team exists
+        team_repo = ctx.obj["build_service"]._teams
+        if not team_repo.exists(value):
+            click.echo(o.error(f"Team not found: {value}"), err=True)
+            raise SystemExit(1)
+        from pathlib import Path as _Path
+        new_config = Config(
+            starters_dir=config.starters_dir,
+            org_home=_Path(config.org_home),
+            default_backend=config.default_backend,
+            default_team=value,
+            reflection=config.reflection,
+        )
+        save_settings(new_config)
+        click.echo(o.success(f"team = {value}"))
+
+    # backend / default_backend
+    elif key in ("backend", "default_backend"):
+        sync_svc = ctx.obj["sync_service"]
+        known = [info.name for info in sync_svc.list_backends()]
+        if value not in known:
+            click.echo(o.error(f"Unknown backend: {value}. Available: {', '.join(known)}"), err=True)
+            raise SystemExit(1)
+        set_active_backend(config, value)
+        click.echo(o.success(f"backend = {value}"))
+
+    # project
+    elif key == "project":
+        proj_svc = ctx.obj["project_service"]
+        try:
+            proj_svc.activate(value)
+            click.echo(o.success(f"project = {value}"))
+        except ValueError as e:
+            click.echo(o.error(str(e)), err=True)
+            raise SystemExit(1)
+
+    # reflection
+    elif key == "reflection":
         try:
             mode = ReflectionMode(value)
         except ValueError:
@@ -394,21 +461,54 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
             raise SystemExit(1)
         set_reflection_mode(config, mode)
         click.echo(o.success(f"reflection = {value}"))
-        return
 
-    parsed = value
+    # org
+    elif key == "org":
+        from agentorg.config import set_active_org
+        set_active_org(value)
+        click.echo(o.success(f"org = {value}"))
+        click.echo(o.dim("Restart fleet for the change to take effect."))
 
-    from pathlib import Path as _Path
-    kwargs = {
-        "starters_dir": config.starters_dir,
-        "org_home": _Path(config.org_home) if key != "org_home" else _Path(parsed).expanduser(),
-        "default_backend": config.default_backend if key != "default_backend" else parsed,
-        "default_team": config.default_team if key != "default_team" else parsed,
-        "reflection": config.reflection,
-    }
-    new_config = Config(**kwargs)
-    save_settings(new_config)
-    click.echo(o.success(f"Set {key} = {parsed}"))
+    # condense_after
+    elif key == "condense_after":
+        try:
+            int_val = int(value)
+        except ValueError:
+            click.echo(o.error(f"condense_after must be an integer, got: {value}"), err=True)
+            raise SystemExit(1)
+        if int_val < 0:
+            click.echo(o.error("condense_after must be non-negative"), err=True)
+            raise SystemExit(1)
+        set_condense_after(config, int_val)
+        click.echo(o.success(f"condense_after = {int_val}"))
+
+    # org_home
+    elif key == "org_home":
+        from pathlib import Path as _Path
+        new_config = Config(
+            starters_dir=config.starters_dir,
+            org_home=_Path(value).expanduser(),
+            default_backend=config.default_backend,
+            default_team=config.default_team,
+            reflection=config.reflection,
+        )
+        save_settings(new_config)
+        click.echo(o.success(f"org_home = {value}"))
+
+
+@config_cmd.command("clear")
+@click.argument("key", type=click.Choice(["project", "org"]))
+@click.pass_context
+def config_clear(ctx: click.Context, key: str) -> None:
+    """Clear a context value (project or org)."""
+    if key == "project":
+        ctx.obj["project_service"].deactivate()
+        click.echo(o.success("project cleared — running in one-off mode."))
+    elif key == "org":
+        from agentorg.config import clear_active_org
+        clear_active_org()
+        click.echo(o.success("org cleared — using default org."))
+        click.echo(o.dim("Restart fleet for the change to take effect."))
 
 
 # ── Status ──
@@ -462,108 +562,6 @@ def status(ctx: click.Context) -> None:
     click.echo()
 
 
-# ── Context ──
-
-@fleet.group(invoke_without_command=True)
-@click.pass_context
-def context(ctx: click.Context) -> None:
-    """View or change active context (team, backend, project, reflection)."""
-    if ctx.invoked_subcommand is not None:
-        return
-    config = ctx.obj["config"]
-    from agentorg.config import get_active_org
-
-    active_backend = get_active_backend(config)
-    proj_svc = ctx.obj["project_service"]
-    active_project = proj_svc.get_active()
-    active_org_name = get_active_org() or "default"
-    mode = get_reflection_mode(config)
-
-    click.echo()
-    click.echo(f"  team:       {o.bold(config.default_team)}")
-    click.echo(f"  backend:    {o.bold(active_backend)}")
-    project_str = o.bold(active_project.id) if active_project else o.dim("(none)")
-    click.echo(f"  project:    {project_str}")
-    click.echo(f"  reflection: {mode.value}")
-    org_str = o.dim(active_org_name) if active_org_name == "default" else o.bold(active_org_name)
-    click.echo(f"  org:        {org_str}")
-    click.echo()
-
-
-@context.command("set")
-@click.argument("key", type=click.Choice(["team", "backend", "project", "reflection", "org"]))
-@click.argument("value")
-@click.pass_context
-def context_set(ctx: click.Context, key: str, value: str) -> None:
-    """Change a context value."""
-    config = ctx.obj["config"]
-
-    if key == "team":
-        # Validate team exists
-        team_repo = ctx.obj["build_service"]._teams
-        if not team_repo.exists(value):
-            click.echo(o.error(f"Team not found: {value}"), err=True)
-            raise SystemExit(1)
-        from pathlib import Path as _Path
-        new_config = Config(
-            starters_dir=config.starters_dir,
-            org_home=_Path(config.org_home),
-            default_backend=config.default_backend,
-            default_team=value,
-            reflection=config.reflection,
-        )
-        save_settings(new_config)
-        click.echo(o.success(f"team = {value}"))
-
-    elif key == "backend":
-        sync_svc = ctx.obj["sync_service"]
-        known = [info.name for info in sync_svc.list_backends()]
-        if value not in known:
-            click.echo(o.error(f"Unknown backend: {value}. Available: {', '.join(known)}"), err=True)
-            raise SystemExit(1)
-        set_active_backend(config, value)
-        click.echo(o.success(f"backend = {value}"))
-
-    elif key == "project":
-        proj_svc = ctx.obj["project_service"]
-        try:
-            proj_svc.activate(value)
-            click.echo(o.success(f"project = {value}"))
-        except ValueError as e:
-            click.echo(o.error(str(e)), err=True)
-            raise SystemExit(1)
-
-    elif key == "reflection":
-        try:
-            mode = ReflectionMode(value)
-        except ValueError:
-            click.echo(o.error(f"Invalid: {value}. Use: auto, review, off"), err=True)
-            raise SystemExit(1)
-        set_reflection_mode(config, mode)
-        click.echo(o.success(f"reflection = {value}"))
-
-    elif key == "org":
-        from agentorg.config import set_active_org
-        set_active_org(value)
-        click.echo(o.success(f"org = {value}"))
-        click.echo(o.dim("Restart fleet for the change to take effect."))
-
-
-@context.command("clear")
-@click.argument("key", type=click.Choice(["project", "org"]))
-@click.pass_context
-def context_clear(ctx: click.Context, key: str) -> None:
-    """Clear a context value (project or org)."""
-    if key == "project":
-        ctx.obj["project_service"].deactivate()
-        click.echo(o.success("project cleared — running in one-off mode."))
-    elif key == "org":
-        from agentorg.config import clear_active_org
-        clear_active_org()
-        click.echo(o.success("org cleared — using default org."))
-        click.echo(o.dim("Restart fleet for the change to take effect."))
-
-
 # ── Run ──
 
 @fleet.command()
@@ -606,12 +604,14 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
         team_id = team or ctx.obj["config"].default_team
         click.echo(o.dim(f"Running via {backend_name} (team: {team_id})..."), err=True)
         click.echo()
+        condense = get_condense_after(ctx.obj["config"])
         try:
             result = run_svc.execute(
                 backend=b, team_id=team_id, task=task_str, solo=solo,
                 reflection_mode=mode,
                 project_root=project_root,
                 project_id=project_id,
+                condense_after=condense,
             )
         except RuntimeError as e:
             click.echo(o.error(f"Execution failed: {e}"), err=True)
@@ -1191,23 +1191,35 @@ def reflect(ctx: click.Context, prompt_only: bool, write_back: bool, role_id: st
 
     click.echo(output)
 
-    if write_back:
-        # Explicit --write-back always writes
+    def _do_write_back():
         result = reflect_svc.write_back(output, project_root=project_root)
         _report_reflection(result)
+        # Check if condensation is needed
+        condense = get_condense_after(config)
+        if condense > 0:
+            condensed_ids = reflect_svc.maybe_condense(
+                backend=b, condense_after=condense,
+            )
+            if condensed_ids:
+                click.echo(
+                    o.dim(f"Condensed learnings for: {', '.join(condensed_ids)}"),
+                    err=True,
+                )
+
+    if write_back:
+        # Explicit --write-back always writes
+        _do_write_back()
     else:
         # Check reflection mode
         mode = get_reflection_mode(config)
         if mode == ReflectionMode.AUTO:
-            result = reflect_svc.write_back(output, project_root=project_root)
-            _report_reflection(result)
+            _do_write_back()
         elif mode == ReflectionMode.REVIEW:
             click.echo()
             click.echo(o.bold("Reflection complete. Review learnings before saving:"))
             click.echo()
             if click.confirm("Write these learnings back?"):
-                result = reflect_svc.write_back(output, project_root=project_root)
-                _report_reflection(result)
+                _do_write_back()
             else:
                 click.echo(o.dim("Learnings discarded."))
         # OFF mode: output was shown but nothing written

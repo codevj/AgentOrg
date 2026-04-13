@@ -37,6 +37,7 @@ _DEFAULT_SETTINGS = {
     "default_backend": "claude",
     "default_team": "product-delivery",
     "reflection": "auto",
+    "condense_after": 5,
 }
 
 
@@ -173,7 +174,12 @@ def _load_settings_file(path: Path) -> dict:
 def save_settings(config: Config) -> None:
     """Write current settings to the settings file."""
     config.org_home.mkdir(parents=True, exist_ok=True)
+    # Preserve any extra keys (like condense_after) already in the file
+    existing: dict = {}
+    if config.settings_file.is_file():
+        existing = yaml.safe_load(config.settings_file.read_text()) or {}
     data = {
+        **existing,
         "org_home": str(config.org_home),
         "default_backend": config.default_backend,
         "default_team": config.default_team,
@@ -284,6 +290,30 @@ def get_active_backend(config: Config) -> str:
         if value:
             return value
     return config.default_backend
+
+
+def get_condense_after(config: Config) -> int:
+    """Read condense_after from settings file. Defaults to 5."""
+    settings_file = config.org_home / _SETTINGS_FILENAME
+    if settings_file.is_file():
+        data = yaml.safe_load(settings_file.read_text()) or {}
+        val = data.get("condense_after", _DEFAULT_SETTINGS["condense_after"])
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return _DEFAULT_SETTINGS["condense_after"]
+    return _DEFAULT_SETTINGS["condense_after"]
+
+
+def set_condense_after(config: Config, value: int) -> None:
+    """Write condense_after to settings file, preserving other settings."""
+    settings_file = config.org_home / _SETTINGS_FILENAME
+    config.org_home.mkdir(parents=True, exist_ok=True)
+    data: dict = {}
+    if settings_file.is_file():
+        data = yaml.safe_load(settings_file.read_text()) or {}
+    data["condense_after"] = value
+    settings_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
 
 def set_active_backend(config: Config, name: str) -> None:
