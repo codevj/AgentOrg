@@ -140,18 +140,20 @@ class ClaudeBackend:
             raise RuntimeError(f"Claude execution failed: {result.stderr}")
         return result.stdout
 
-    def execute(self, team_id: str, task: str, run_id: str) -> str:
+    def execute(self, team_id: str, task: str, run_id: str, cwd: Path | None = None) -> str:
         """Sync agents and launch the team lead agent interactively via Claude Code.
 
         Hands off control to Claude Code — the user sees live output.
         Returns empty string since output goes directly to terminal.
+        If cwd is provided, Claude Code runs in that directory (otherwise uses current cwd).
         """
         self.sync(team_id)
         if not self._executor.is_installed("claude"):
             raise RuntimeError("'claude' CLI not found")
         lead = self._lead_filename(team_id).removesuffix(".md")
         exit_code = self._executor.run_interactive(
-            f'claude --agent {lead} "{self._escape(task)}"'
+            f'claude --agent {lead} "{self._escape(task)}"',
+            cwd=cwd,
         )
         if exit_code != 0:
             raise RuntimeError(f"Claude Code exited with code {exit_code}")

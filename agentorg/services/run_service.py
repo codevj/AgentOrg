@@ -215,6 +215,8 @@ class RunService:
         reflection_mode: ReflectionMode = ReflectionMode.AUTO,
         project_root: Path | None = None,
         project_id: str | None = None,
+        project_repo_paths: list[Path] | None = None,
+        scratch_dir: Path | None = None,
         condense_after: int = 0,
     ) -> Run:
         """Execute a task via a backend. Returns the Run record."""
@@ -244,8 +246,16 @@ class RunService:
         else:
             prompt = self.build_team_prompt(team_id, task, project_root=project_root)  # type: ignore[arg-type]
 
+        # Resolve workdir: first project repo if set, else scratch_dir (creating it)
+        workdir: Path | None = None
+        if project_repo_paths:
+            workdir = project_repo_paths[0]
+        elif scratch_dir is not None:
+            scratch_dir.mkdir(parents=True, exist_ok=True)
+            workdir = scratch_dir
+
         # Execute via backend's agent orchestration
-        output = backend.execute(team_id or "solo", task, run_id)
+        output = backend.execute(team_id or "solo", task, run_id, cwd=workdir)
         budget.record(BudgetActivity.EXEC)
 
         run = Run(

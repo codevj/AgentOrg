@@ -34,6 +34,10 @@ class Backend(Protocol):
         """Send a prompt to the backend CLI and return the response. No sync, no team."""
         ...
 
-    def execute(self, team_id: str, task: str, run_id: str) -> str:
-        """Sync agents and execute a task via the backend's agent orchestration. Returns output."""
+    def execute(self, team_id: str, task: str, run_id: str, cwd: Path | None = None) -> str:
+        """Sync agents and execute a task via the backend's agent orchestration.
+
+        If cwd is provided, the backend runs in that directory.
+        Returns output (may be empty string if the backend streams directly to terminal).
+        """
         ...

@@ -123,6 +123,6 @@ class CopilotBackend:
             raise RuntimeError(f"Copilot execution failed: {result.stderr}")
         return result.stdout
 
-    def execute(self, team_id: str, task: str, run_id: str) -> str:
+    def execute(self, team_id: str, task: str, run_id: str, cwd: Path | None = None) -> str:
         self.sync(team_id)
         return self.prompt(task)

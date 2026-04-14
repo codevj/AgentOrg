@@ -38,6 +38,7 @@ _DEFAULT_SETTINGS = {
     "default_team": "product-delivery",
     "reflection": "auto",
     "condense_after": 5,
+    "scratch_dir": "~/.agent-org/scratch",
 }
 
 
@@ -346,4 +347,17 @@ def get_condense_after(config: Config) -> int:
 def set_condense_after(config: Config, value: int) -> None:
     data = _read_settings(config)
     data["condense_after"] = value
+    _write_settings(config, data)
+
+
+def get_scratch_dir(config: Config) -> Path:
+    """Read scratch_dir from settings. Defaults to ~/.agent-org/scratch."""
+    data = _read_settings(config)
+    raw = data.get("scratch_dir", _DEFAULT_SETTINGS["scratch_dir"])
+    return Path(raw).expanduser()
+
+
+def set_scratch_dir(config: Config, path: str) -> None:
+    data = _read_settings(config)
+    data["scratch_dir"] = path
     _write_settings(config, data)

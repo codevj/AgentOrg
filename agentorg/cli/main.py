@@ -336,6 +336,13 @@ def init(ctx: click.Context) -> None:
     except ValueError:
         condense_after_val = 5
 
+    # Scratch dir — where tasks run when no project is active
+    default_scratch = str(Path(config.org_home).expanduser() / "scratch")
+    scratch = click.prompt(
+        "Scratch directory (where tasks run without an active project)",
+        default=default_scratch,
+    )
+
     from pathlib import Path as _Path
     new_config = Config(
         starters_dir=config.starters_dir,
@@ -346,6 +353,8 @@ def init(ctx: click.Context) -> None:
     )
     save_settings(new_config)
     set_condense_after(new_config, condense_after_val)
+    from agentorg.config import set_scratch_dir
+    set_scratch_dir(new_config, scratch)
 
     # Create directories
     new_config.org_home.mkdir(parents=True, exist_ok=True)
@@ -377,6 +386,8 @@ def config_cmd(ctx: click.Context) -> None:
         active_org_name = get_active_org()
         mode = get_reflection_mode(config)
         condense = get_condense_after(config)
+        from agentorg.config import get_scratch_dir
+        scratch = get_scratch_dir(config)
 
         click.echo()
         click.echo(o.bold("Settings") + "  " + o.dim(str(config.settings_file)))
@@ -389,6 +400,7 @@ def config_cmd(ctx: click.Context) -> None:
         click.echo(f"  org:               {org_str}")
         click.echo(f"  reflection:        {mode.value}")
         click.echo(f"  condense_after:    {condense}")
+        click.echo(f"  scratch_dir:       {scratch}")
         click.echo(f"  org_home:          {config.org_home}")
         click.echo()
         if not config.settings_file.is_file():
@@ -407,7 +419,7 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
     config = ctx.obj["config"]
     valid_keys = {
         "team", "default_team", "backend", "default_backend",
-        "project", "reflection", "org", "condense_after", "org_home",
+        "project", "reflection", "org", "condense_after", "scratch_dir", "org_home",
     }
 
     if key not in valid_keys:
@@ -481,6 +493,12 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
             raise SystemExit(1)
         set_condense_after(config, int_val)
         click.echo(o.success(f"condense_after = {int_val}"))
+
+    # scratch_dir
+    elif key == "scratch_dir":
+        from agentorg.config import set_scratch_dir
+        set_scratch_dir(config, value)
+        click.echo(o.success(f"scratch_dir = {value}"))
 
     # org_home
     elif key == "org_home":
@@ -605,12 +623,20 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
         click.echo(o.dim(f"Running via {backend_name} (team: {team_id})..."), err=True)
         click.echo()
         condense = get_condense_after(ctx.obj["config"])
+
+        # Resolve workdir: project's repos if a project is active, else scratch_dir
+        from agentorg.config import get_scratch_dir
+        project_repo_paths = active_project.repo_paths if active_project and active_project.repo_paths else None
+        scratch = get_scratch_dir(ctx.obj["config"])
+
         try:
             result = run_svc.execute(
                 backend=b, team_id=team_id, task=task_str, solo=solo,
                 reflection_mode=mode,
                 project_root=project_root,
                 project_id=project_id,
+                project_repo_paths=project_repo_paths,
+                scratch_dir=scratch,
                 condense_after=condense,
             )
         except RuntimeError as e:
