@@ -15,7 +15,7 @@ class CopilotBackend:
     def __init__(
         self,
         *,
-        org_name: str,
+        org_name: str | None,
         persona_repo: PersonaRepository,
         team_repo: TeamRepository,
         skill_repo: SkillRepository,

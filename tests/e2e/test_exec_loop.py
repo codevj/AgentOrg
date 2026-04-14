@@ -49,20 +49,25 @@ def reflection_response() -> str:
 
 @pytest.fixture
 def org_home(tmp_path: Path) -> Path:
-    """Isolated org_home directory for a test run."""
-    home = tmp_path / "org_home"
-    home.mkdir()
-    # Create a minimal settings file so init check passes
+    """Isolated org_home for a test run, set up like a real named org."""
+    root = tmp_path / "agent_org_root"
+    home = root / "orgs" / "testorg"
+    home.mkdir(parents=True)
     (home / "settings.yaml").write_text(
-        "default_backend: claude\ndefault_team: product-delivery\nreflection: auto\n"
+        f"default_backend: claude\ndefault_team: product-delivery\nreflection: auto\nscratch_dir: {home / 'scratch'}\n"
     )
+    (root / ".active-org").write_text("testorg")
     return home
 
 
 @pytest.fixture
 def runner(org_home: Path) -> CliRunner:
-    """CliRunner with isolated AGENT_ORG_HOME."""
-    return CliRunner(env={"AGENT_ORG_HOME": str(org_home)})
+    """CliRunner with isolated org setup."""
+    root = org_home.parent.parent  # org_home = root/orgs/testorg
+    return CliRunner(env={
+        "AGENT_ORG_HOME": str(org_home),
+        "AGENT_ORG_ROOT": str(root),
+    })
 
 
 @pytest.fixture

@@ -14,14 +14,18 @@ from agentorg.cli.main import fleet
 
 @pytest.fixture
 def runner(tmp_path: Path):
-    """CliRunner with isolated org_home so tests don't touch real ~/.agent-org/."""
-    org_home = tmp_path / "org_home"
-    org_home.mkdir()
-    # Create a minimal settings file so init check passes
+    """CliRunner with isolated org setup so tests don't touch real ~/.agent-org/."""
+    root = tmp_path / "agent_org_root"
+    org_home = root / "orgs" / "testorg"
+    org_home.mkdir(parents=True)
     (org_home / "settings.yaml").write_text(
-        "default_backend: claude\ndefault_team: product-delivery\nreflection: auto\n"
+        f"default_backend: claude\ndefault_team: product-delivery\nreflection: auto\nscratch_dir: {org_home / 'scratch'}\n"
     )
-    env = {"AGENT_ORG_HOME": str(org_home)}
+    (root / ".active-org").write_text("testorg")
+    env = {
+        "AGENT_ORG_HOME": str(org_home),
+        "AGENT_ORG_ROOT": str(root),
+    }
     r = CliRunner(env=env)
     return r
 
@@ -90,13 +94,13 @@ class TestSync:
         assert "Synced" in result.output
         # Check agent files were created in user-level dir with org prefix
         agent_dir = Path.home() / ".claude" / "agents"
-        assert (agent_dir / "fleet-test-architect.md").is_file()
-        assert (agent_dir / "fleet-test-product-delivery-lead.md").is_file()
+        assert (agent_dir / "fleet-testorg-architect.md").is_file()
+        assert (agent_dir / "fleet-testorg-product-delivery-lead.md").is_file()
 
 
 class TestHire:
     def test_hire_creates_persona(self, runner: CliRunner, tmp_path: Path):
-        org_home = tmp_path / "org_home"
+        org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
         result = runner.invoke(fleet, ["hire", "--non-interactive", "sales-rep"])
         assert result.exit_code == 0
         assert "Hired: sales-rep" in result.output
@@ -117,7 +121,7 @@ class TestHire:
 
 class TestTeam:
     def test_create_team(self, runner: CliRunner, tmp_path: Path):
-        org_home = tmp_path / "org_home"
+        org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
         result = runner.invoke(fleet, ["team", "my-team"])
         assert result.exit_code == 0
         assert "Team created: my-team" in result.output
@@ -153,7 +157,7 @@ class TestOrg:
 
 class TestAdopt:
     def test_adopt_persona(self, runner: CliRunner, tmp_path: Path):
-        org_home = tmp_path / "org_home"
+        org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
         result = runner.invoke(fleet, ["adopt", "persona", "architect"])
         assert result.exit_code == 0
         assert "Adopted: architect" in result.output

@@ -16,7 +16,7 @@ class ClaudeBackend:
     def __init__(
         self,
         *,
-        org_name: str,
+        org_name: str | None,
         persona_repo: PersonaRepository,
         team_repo: TeamRepository,
         skill_repo: SkillRepository,
@@ -36,7 +36,11 @@ class ClaudeBackend:
         self._contracts_dir = contracts_dir
 
     def _prefix(self) -> str:
-        """'fleet-{org}-' — every org is named, so every agent file is prefixed."""
+        """'fleet-{org}-' — every org must be named."""
+        if not self._org_name:
+            raise RuntimeError(
+                "No active org. Run 'fleet init' to create one."
+            )
         return f"fleet-{self._org_name}-"
 
     def _agent_filename(self, persona_id: str) -> str:

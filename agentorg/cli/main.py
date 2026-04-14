@@ -62,18 +62,25 @@ def _build_context() -> dict:
     from agentorg.adapters.backends.registry import BackendRegistry
 
     # Resolve org_name for backend agent file prefixing.
-    # When AGENT_ORG_HOME env var is set (tests), use "test" as the org name.
-    # Otherwise read the active org from .active-org.
+    # Read .active-org from AGENT_ORG_HOME (tests) or the standard root (users).
+    # If it can't be resolved, backends get None — they MUST handle this by
+    # erroring before doing anything that needs a name. No silent fallbacks.
     import os as _os
-    if _os.environ.get("AGENT_ORG_HOME"):
-        org_name = "test"
+    from pathlib import Path as _Path
+    org_name: str | None = None
+    # AGENT_ORG_ROOT is always where .active-org lives (tests set it explicitly).
+    # AGENT_ORG_HOME points to the active org dir.
+    if env_root := _os.environ.get("AGENT_ORG_ROOT"):
+        active_file = _Path(env_root) / ".active-org"
+        if active_file.is_file():
+            org_name = active_file.read_text().strip() or None
     else:
         from agentorg.config import get_active_org
         try:
             org_name = get_active_org()
         except Exception:
             # Not initialized yet — init flow will run before any backend use.
-            org_name = "uninitialized"
+            org_name = None
 
     backend_kwargs = dict(
         org_name=org_name,
