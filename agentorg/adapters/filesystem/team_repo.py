@@ -77,7 +77,22 @@ class FileTeamRepository:
         data = {
             "team_id": team.id,
             "mode_default": team.mode_default.value,
-            "personas": team.persona_ids,
+        }
+        # Prefer the graph format (roles: with depends_on) to preserve
+        # parallelism. Fall back to flat personas: when no dependencies.
+        has_deps = any(rs.depends_on for rs in team.role_specs)
+        if team.role_specs and has_deps:
+            roles_data = []
+            for rs in team.role_specs:
+                entry: dict = {"id": rs.id}
+                if rs.depends_on:
+                    entry["depends_on"] = list(rs.depends_on)
+                roles_data.append(entry)
+            data["roles"] = roles_data
+        else:
+            data["personas"] = team.persona_ids
+
+        data.update({
             "governance_profile": team.governance_profile,
             "execution_profile": team.execution_profile,
             "gates": {
@@ -89,5 +104,5 @@ class FileTeamRepository:
                 "reflection": team.budget.reflection,
                 "interactions": team.budget.interactions,
             },
-        }
+        })
         return yaml.dump(data, default_flow_style=False, sort_keys=False)

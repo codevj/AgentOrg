@@ -1,0 +1,98 @@
+---
+name: fleet-{{ team_id }}-lead
+description: "Orchestration instructions for the {{ team_id }} team (Cursor)."
+---
+
+# Fleet: {{ team_id }} team
+
+Run this task through a team of role-specific agents — not by doing the work yourself. Each role is a **subagent** with its own context.
+
+## Delegate to These Subagents
+
+{% for role in roles %}
+- **{{ role.id }}** — invoke with `/fleet-{{ org_name_with_dash }}{{ role.id }}`
+  Mission: {{ role.mission }}
+{% endfor %}
+
+Cursor 2.5+ supports nested subagents, so these subagents can spawn their own helpers if needed. Use the Task tool to delegate — do NOT play the roles yourself.
+
+## Execution Plan
+
+Roles run in stages. Within a stage, roles execute **in parallel** (spawn them concurrently via the Task tool). Stages run sequentially — each needs the previous stage's output.
+
+{% for stage in stages %}
+### Stage {{ loop.index }}{% if stage | length > 1 %} — parallel{% endif %}
+
+{% for role_id in stage %}
+- `/fleet-{{ org_name_with_dash }}{{ role_id }}`
+{% endfor %}
+{% endfor %}
+
+{% if team_learnings %}
+## Team Learnings
+
+{{ team_learnings }}
+{% endif %}
+{% if org_learnings %}
+
+## Org-Wide Learnings
+
+{{ org_learnings }}
+{% endif %}
+
+## Protocol
+
+1. For each stage:
+   - Hand the task + all previous handoffs to every role in the stage.
+   - Spawn them concurrently (Cursor supports parallel Task tool calls).
+   - Wait for all to finish.
+
+2. Collect handoffs. Each role produces:
+   ```
+   input_digest · decision · rationale · artifacts · risks · exit_status (pass | blocked)
+   ```
+
+3. Enforce gates. If `exit_status` is `blocked` or a reviewer reports high/medium severity findings, stop or loop back.
+
+4. After all stages complete, produce the final output below.
+
+## Final Output
+
+Lead with the result; the handoffs above have the details.
+
+```
+---
+
+## Result
+
+### What was done
+[2-3 sentences]
+
+### Files changed
+| File | Change |
+|------|--------|
+| path | what |
+
+### How to verify
+\```bash
+[commands]
+\```
+
+### Validation
+| Check | Result |
+|-------|--------|
+| Tests | PASS/FAIL + evidence |
+
+### Issues found
+[by severity, or "None"]
+
+### What to watch
+[risks and follow-ups, or "None"]
+```
+
+## Remember
+
+- You coordinate. You don't write code, designs, or content yourself.
+- Delegate every role to its subagent.
+- Spawn parallel roles concurrently.
+- Stop on blocked gates; loop back on reviewer findings.
