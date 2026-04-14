@@ -222,14 +222,34 @@ fleet run "your task"
   → Reflection → learnings saved for next time
 ```
 
-**Roles run in parallel when they can.** Teams define a dependency graph — roles with the same dependencies run simultaneously. The fleet-lead spawns them using Claude Code's Agent tool, which handles parallel execution natively.
+**Roles run in parallel when they can.** Teams define a dependency graph — roles with the same dependencies run simultaneously. Each backend uses its native parallel execution:
+- **Claude Code** — creates an agent team; each teammate gets its own context window (and its own tmux pane if configured)
+- **Cursor** — invokes subagents via `/fleet-{org}-{role}`, nested delegation supported
+- **Copilot** — uses the native `/fleet` command for parallel dispatch
 
-For the best visual experience with parallel agents, enable tmux mode in Claude Code:
+### See agents working in separate panes (Claude Code)
 
-```json
-// ~/.claude.json
+To see each role's output in its own tmux pane as they run:
+
+```bash
+# 1. Enable experimental agent teams (required once)
+# Add to ~/.claude/settings.json:
+{
+  "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" }
+}
+
+# 2. Set pane display mode (required once)
+# Add to ~/.claude.json:
 { "teammateMode": "tmux" }
+
+# 3. Start a tmux session (required every time — panes only work inside tmux)
+tmux new -s fleet
+
+# 4. Run fleet from inside tmux
+fleet run "your task"
 ```
+
+Without tmux, agent teams still work — you'll see the output inline instead of in panes.
 
 Each role produces a structured **handoff** before the next stage starts. Quality gates enforce that blocked roles stop the pipeline.
 
