@@ -1,8 +1,6 @@
 # AgentOrg
 
-**Work like a CEO.**
-
-Delegate. Don't do.
+AgentOrg turns your AI tool into an organization. Dispatch a whole team when a task needs coverage, or one specialist when it needs depth. Every run makes the org smarter. Runs on Claude Code, Cursor, and Copilot.
 
 <p align="center">
   <img src="images/agentorg-overview.svg" alt="AgentOrg — teams, projects, intelligence loop, backends" width="850"/>
@@ -12,37 +10,28 @@ Delegate. Don't do.
 fleet run "Add rate limiting to the API"
 ```
 
-Your PM scopes it. Your architect designs it. Your developer builds it. Your tester and reviewer check it — in parallel. Each role hands off structured artifacts to the next. Quality gates block bad work. And your whole org gets smarter with every run.
+Fleet writes a separate agent file per role (PM, architect, developer, tester, reviewer), then launches your AI tool with an orchestration prompt that runs them in a defined order — some stages in parallel — with a required handoff format between stages. After the run, a reflection pass writes learnings back to disk so the next run loads them.
 
-## Why
+## What it does
 
-**A CEO doesn't ship features. A CEO runs an organization that ships features.**
-
-Today's AI assistants put you in every seat at once — PM, architect, developer, tester, reviewer. That's not leverage; it's a to-do list with better autocomplete. You're still doing every role's job, just faster.
-
-AgentOrg gives you what a CEO has:
-
-- **An organization.** Roles with missions. Teams with process. Quality gates that block bad work.
-- **Delegation, not dictation.** You set direction. Your org executes. You review, decide, move on.
-- **Pick the right team for the job.** Product delivery for features. Strategy analysis for decisions. Content production for writing. Incident response for ops. Six starter teams; build your own.
-- **Or call in a single specialist.** Don't need the whole team? Ask just the architect, or just the critic. Same CEO seat, narrower cut.
-- **Institutional memory.** Your architect learns your codebase. Your reviewer learns your common mistakes. Learnings condense — signal stays, noise goes. Run 20 is better than run 1.
-- **Separate orgs for separate contexts.** Work org, personal org, experimental org. Roles and knowledge don't leak between them.
-
-Define it once. Run it everywhere — Claude Code, Cursor, or Copilot.
+- Generates one agent `.md` file per role to `~/.claude/agents/` (or Cursor/Copilot equivalents)
+- Launches `claude`/`cursor`/`copilot` with a team lead prompt that invokes those agents in dependency order
+- Enforces a handoff template between stages (required inputs → exit criteria)
+- Runs reflection after each task and appends to three learning files: role, project, org
+- Condenses those learning files every N reflections (configurable)
 
 ```bash
-fleet run "Add rate limiting"                    # default team (or role)
-fleet run --team content-production "write blog" # pick a team for this one
-fleet run --role architect "should we use X?"    # call in one specialist
-fleet run --project my-api "Add auth"            # in a codebase context
-fleet run --new "rate limiting"                  # draft a spec first, then run
+fleet run "Add rate limiting"                    # default team
+fleet run --team content-production "write blog" # different team
+fleet run --role architect "should we use X?"    # single role, no team
+fleet run --project my-api "Add auth"            # project context
+fleet run --new "rate limiting"                  # draft a spec first
 
-fleet config set team strategy-analysis          # switch default team
+fleet config set team strategy-analysis          # switch default
 fleet config set role architect                  # switch to role mode
 ```
 
-You're the CEO. One command sets direction. Your org does the rest.
+Six starter teams (software, content, strategy, research, ops, docs). 19 starter roles. Build your own with `fleet role create` / `fleet team create`.
 
 ## Honest pitch: do you actually need this?
 
@@ -53,13 +42,13 @@ At the end of the day, AgentOrg launches Claude Code (or Cursor, or Copilot). Ev
 - You're happy maintaining agent `.md` files and CLAUDE.md directly
 - A good prompt and maybe a subagent or two covers your needs
 
-**Fleet is worth it if you want:**
-- **One org definition, many AI tools.** Fleet syncs the same roles/teams to Claude Code, Cursor, and Copilot. If you use more than one, you define it once.
-- **Isolated orgs for different contexts.** Work vs personal vs experimental — each with its own roles, knowledge, and history. No leakage. Claude Code has one `~/.claude/`.
-- **Team compositions as versioned config.** A team YAML with role dependencies is committable, reviewable, shareable. Your team knows what "product-delivery" means because it's in git.
-- **Structured learnings that don't drift.** Three explicit layers (role / project / org). Automatic condensation after N reflections — signal stays, noise goes. Changelog for lineage. Freeform agent memory doesn't give you this.
-- **Project context that travels with every task.** Architecture, glossary, build commands, failure modes — injected automatically on every run in that project. CLAUDE.md covers some of this; project-level knowledge accumulation across runs doesn't exist there.
-- **Predictable commands, not prompts.** `fleet run`, `fleet project use`, `fleet config set team X` — an opinionated CLI that models the work, instead of "ask your AI to do X the right way."
+**What fleet actually gives you over rolling your own:**
+- One role/team definition syncs to Claude Code, Cursor, and Copilot agent directories
+- Multiple isolated orgs with separate roles, knowledge, and run history (Claude Code itself has one `~/.claude/`)
+- Team YAML with a role dependency graph, committable to git
+- Three separate learning files (role / project / org) with a configurable condensation pass
+- Project context (architecture, commands, runbooks) injected on every run when a project is active
+- A CLI (`fleet run`, `fleet project use`, `fleet config set …`) instead of ad-hoc prompts
 
 **What's still unproven:**
 - Does run 20 actually outperform run 1? The intelligence loop compounds learnings, but we don't have measured data.
