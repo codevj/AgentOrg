@@ -1,0 +1,79 @@
+# Fleet: {{ team_id }} team
+
+Run this task through a team of role-specific agents using Copilot CLI's `/fleet` command for parallel execution.
+
+## Delegate to These Roles
+
+Each role has a charter at `~/.squad/agents/{role}/charter.md`. These define identity, scope, and boundaries.
+
+{% for role in roles %}
+- **{{ role.id }}** — {{ role.mission }}
+{% endfor %}
+
+## Execution Plan
+
+Roles run in stages. Within a stage, roles execute **in parallel** using `/fleet`. Stages run sequentially.
+
+{% for stage in stages %}
+### Stage {{ loop.index }}{% if stage | length > 1 %} — parallel{% endif %}
+
+{% if stage | length > 1 %}Use `/fleet` to dispatch these concurrently:{% endif %}
+{% for role_id in stage %}
+- {{ role_id }} (charter: `~/.squad/agents/{{ role_id }}/charter.md`)
+{% endfor %}
+{% endfor %}
+
+{% if team_learnings %}
+## Team Learnings
+
+{{ team_learnings }}
+{% endif %}
+{% if org_learnings %}
+
+## Org-Wide Learnings
+
+{{ org_learnings }}
+{% endif %}
+
+## Protocol
+
+1. For each stage, dispatch every role with the original task + all upstream handoffs as context.
+2. For parallel stages (multiple roles), use `/fleet` so they run concurrently with isolated context windows.
+3. Collect each role's handoff: `input_digest · decision · rationale · artifacts · risks · exit_status`.
+4. If `exit_status: blocked` or high/medium severity findings from a reviewer, stop or loop back.
+5. After all stages complete, produce the final Result section.
+
+## Final Output
+
+```
+---
+
+## Result
+
+### What was done
+[2-3 sentences]
+
+### Files changed
+| File | Change |
+
+### How to verify
+\```bash
+[commands]
+\```
+
+### Validation
+| Check | Result |
+
+### Issues found
+[by severity, or "None"]
+
+### What to watch
+[risks and follow-ups, or "None"]
+```
+
+## Remember
+
+- You coordinate via `/fleet`. You don't write code, designs, or content yourself.
+- Each parallel stage should use `/fleet` so roles run concurrently.
+- Each role reads its charter in `~/.squad/agents/{role}/charter.md` for its scope and boundaries.
+- Note: shared filesystem, no file locking — if roles in the same stage touch the same files, sequence them across stages instead.

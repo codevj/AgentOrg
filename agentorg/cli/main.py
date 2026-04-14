@@ -93,7 +93,7 @@ def _build_context() -> dict:
     )
     registry = BackendRegistry()
     registry.register(ClaudeBackend(renderer=renderer, **backend_kwargs))
-    registry.register(CopilotBackend(**backend_kwargs))
+    registry.register(CopilotBackend(renderer=renderer, **backend_kwargs))
     registry.register(CursorBackend(renderer=renderer, **backend_kwargs))
 
     # Services
