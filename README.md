@@ -18,6 +18,17 @@ You wouldn't ship code that only one person looked at. Why accept that from AI?
 
 One agent gives you one shot. AgentOrg gives you an organization — roles that plan, build, test, and review each other's work. The reviewer catches what the developer missed. The tester finds edge cases the architect didn't anticipate. Quality gates block bad work from moving forward.
 
+**Team or role — match the mode to the task.** Not every task needs a whole team. For a big feature, run the full product-delivery pipeline. For a quick refactor question, run just the architect. For creative writing, switch to the content-production team. Same command, different mode:
+
+```bash
+fleet run "Add rate limiting"                    # uses your default team (or role)
+fleet run --team content-production "write blog" # one-off team override
+fleet run --role architect "should we use X?"    # one-off role override
+
+fleet config set team content-production         # switch default to a team
+fleet config set role architect                  # switch default to a single role
+```
+
 And your org remembers. Every run teaches it something. Your architect learns your codebase. Your reviewer learns your common mistakes. Learnings condense over time — signal stays, noise goes. Run 20 is better than run 1, automatically.
 
 Define your org once. Use it everywhere — Claude Code, Cursor, or Copilot.

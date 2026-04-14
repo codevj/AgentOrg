@@ -34,6 +34,7 @@ _ACTIVE_ORG_FILENAME = ".active-org"
 _DEFAULT_SETTINGS = {
     "default_backend": "claude",
     "default_team": "product-delivery",
+    "default_role": "",  # empty = team mode; set a role id for role-mode runs
     "reflection": "auto",
     "condense_after": 5,
     "scratch_dir": "~/.agent-org/scratch",
@@ -58,6 +59,7 @@ class Config:
     org_home: Path
     default_backend: str = "claude"
     default_team: str = "product-delivery"
+    default_role: str = ""  # empty = team mode
     reflection: str = "auto"
 
     @classmethod
@@ -101,6 +103,7 @@ class Config:
             org_home=org_home,
             default_backend=settings.get("default_backend", "claude"),
             default_team=settings.get("default_team", "product-delivery"),
+            default_role=settings.get("default_role", ""),
             reflection=raw_reflection,
         )
 
@@ -181,6 +184,7 @@ def save_settings(config: Config) -> None:
         **existing,
         "default_backend": config.default_backend,
         "default_team": config.default_team,
+        "default_role": config.default_role,
         "reflection": config.reflection,
     }
     # org_home is no longer persisted — it's resolved at load time from the

@@ -752,7 +752,14 @@ def config_cmd(ctx: click.Context) -> None:
         click.echo()
         click.echo(o.bold("Settings") + "  " + o.dim(str(config.settings_file)))
         click.echo()
-        click.echo(f"  team:              {o.bold(config.default_team)}")
+        # Show active mode — role if set, else team.
+        if config.default_role:
+            click.echo(f"  mode:              {o.bold('role (single)')}")
+            click.echo(f"  role:              {o.bold(config.default_role)}")
+            click.echo(f"  team:              {o.dim(config.default_team)} " + o.dim("(inactive — role mode)"))
+        else:
+            click.echo(f"  mode:              {o.bold('team')}")
+            click.echo(f"  team:              {o.bold(config.default_team)}")
         click.echo(f"  backend:           {o.bold(active_backend)}")
         project_str = o.bold(active_project.id) if active_project else o.dim("(none)")
         click.echo(f"  project:           {project_str}")
@@ -777,7 +784,8 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
 
     config = ctx.obj["config"]
     valid_keys = {
-        "team", "default_team", "backend", "default_backend",
+        "team", "default_team", "role", "default_role",
+        "backend", "default_backend",
         "project", "reflection", "org", "condense_after", "scratch_dir", "org_home",
     }
 
@@ -785,9 +793,8 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
         click.echo(o.error(f"Unknown key: {key}. Valid: {', '.join(sorted(valid_keys))}"), err=True)
         raise SystemExit(1)
 
-    # team / default_team
+    # team / default_team — also clears default_role (can't have both active)
     if key in ("team", "default_team"):
-        # Validate team exists
         team_repo = ctx.obj["build_service"]._teams
         if not team_repo.exists(value):
             click.echo(o.error(f"Team not found: {value}"), err=True)
@@ -798,10 +805,32 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
             org_home=_Path(config.org_home),
             default_backend=config.default_backend,
             default_team=value,
+            default_role="",  # switching to team mode
             reflection=config.reflection,
         )
         save_settings(new_config)
         click.echo(o.success(f"team = {value}"))
+        if config.default_role:
+            click.echo(o.dim(f"  (default_role cleared — was '{config.default_role}')"), err=True)
+
+    # role / default_role — also clears default_team's active role (team still stored)
+    elif key in ("role", "default_role"):
+        persona_repo = ctx.obj["build_service"]._personas
+        if not persona_repo.exists(value):
+            click.echo(o.error(f"Role not found: {value}"), err=True)
+            raise SystemExit(1)
+        from pathlib import Path as _Path
+        new_config = Config(
+            starters_dir=config.starters_dir,
+            org_home=_Path(config.org_home),
+            default_backend=config.default_backend,
+            default_team=config.default_team,
+            default_role=value,
+            reflection=config.reflection,
+        )
+        save_settings(new_config)
+        click.echo(o.success(f"role = {value}"))
+        click.echo(o.dim("  fleet run will use this role directly (no team handoffs)"), err=True)
 
     # backend / default_backend
     elif key in ("backend", "default_backend"):
@@ -979,6 +1008,12 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, role_id: st
 
     task_str = " ".join(task)
 
+    # Apply default_role if user didn't specify --role or --team
+    if role_id is None and team is None:
+        default_role = ctx.obj["config"].default_role
+        if default_role:
+            role_id = default_role
+
     # --role: single-role execution (replaces `fleet summon`).
     if role_id:
         proj_svc = ctx.obj["project_service"]
@@ -998,6 +1033,25 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, role_id: st
         if b is None:
             click.echo(o.error(f"Backend not found: {backend_name}"), err=True)
             raise SystemExit(1)
+
+        # Print run context for role mode
+        from agentorg.config import get_active_org
+        try:
+            org_name = get_active_org()
+        except Exception:
+            org_name = "(unnamed)"
+        click.echo(o.bold("Run context"), err=True)
+        click.echo(f"  mode:     role (single)", err=True)
+        click.echo(f"  role:     {role_id}", err=True)
+        click.echo(f"  backend:  {backend_name}", err=True)
+        click.echo(f"  org:      {org_name}", err=True)
+        if active_project:
+            click.echo(f"  project:  {active_project.id}", err=True)
+        else:
+            click.echo(f"  project:  {o.dim('(none)')}", err=True)
+        click.echo(o.dim("  Handing off to backend..."), err=True)
+        click.echo()
+
         try:
             output = b.execute("summon", prompt, "summon")
         except RuntimeError as e:
@@ -1092,18 +1146,27 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, role_id: st
                 )
 
         # Print full run context so the user can see what's happening.
+        from agentorg.config import get_active_org
+        try:
+            org_name = get_active_org()
+        except Exception:
+            org_name = "(unnamed)"
         click.echo(o.bold("Run context"), err=True)
-        click.echo(f"  backend:  {backend_name}", err=True)
+        click.echo(f"  mode:     team", err=True)
         click.echo(f"  team:     {team_id}", err=True)
+        click.echo(f"  backend:  {backend_name}", err=True)
+        click.echo(f"  org:      {org_name}", err=True)
+        if active_project:
+            click.echo(f"  project:  {active_project.id}", err=True)
+        else:
+            click.echo(f"  project:  {o.dim('(none)')}", err=True)
+        click.echo(f"  workdir:  {workdir}", err=True)
         if team_obj := (ctx.obj["build_service"]._teams.get(team_id) if team_id else None):
             click.echo(f"  roles:    {' → '.join(team_obj.persona_ids)}", err=True)
             stages = team_obj.execution_stages()
             for i, stage in enumerate(stages, 1):
                 marker = "⚡" if len(stage) > 1 else " "
                 click.echo(f"  stage {i}: {marker} {', '.join(stage)}", err=True)
-        if active_project:
-            click.echo(f"  project:  {active_project.id}", err=True)
-        click.echo(f"  workdir:  {workdir}", err=True)
         click.echo(o.dim("  Handing off to backend..."), err=True)
         click.echo()
 
