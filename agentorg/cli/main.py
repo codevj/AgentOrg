@@ -21,7 +21,19 @@ from agentorg.config import (
 
 def _build_context() -> dict:
     """Wire all dependencies. Called once per CLI invocation."""
-    config = Config.load()
+    from agentorg.config import NotInitializedError
+    try:
+        config = Config.load()
+    except NotInitializedError:
+        # Pre-init state: return a placeholder config pointing at a
+        # not-yet-created org. The fleet() group init check will route to
+        # `fleet init` before any real work runs.
+        from agentorg.config import _root_dir
+        placeholder = _root_dir() / "orgs" / "__uninitialized__"
+        config = Config(
+            starters_dir=Path(__file__).resolve().parents[1] / "starters",
+            org_home=placeholder,
+        )
 
     # Adapters
     from agentorg.adapters.executor import SubprocessExecutor
@@ -49,8 +61,18 @@ def _build_context() -> dict:
     from agentorg.adapters.backends.cursor import CursorBackend
     from agentorg.adapters.backends.registry import BackendRegistry
 
-    from agentorg.config import get_active_org
-    org_name = get_active_org() or "default"
+    # Resolve org_name for backend agent file prefixing.
+    # If AGENT_ORG_HOME env override is set (tests), don't consult the global
+    # .active-org file — treat it as an unnamed/default org context.
+    import os as _os
+    if _os.environ.get("AGENT_ORG_HOME"):
+        org_name = "default"
+    else:
+        from agentorg.config import get_active_org
+        try:
+            org_name = get_active_org()
+        except Exception:
+            org_name = "default"
 
     backend_kwargs = dict(
         org_name=org_name,
@@ -117,19 +139,76 @@ _INIT_NOT_REQUIRED = {"init", "ask"}
 @click.pass_context
 def fleet(ctx: click.Context) -> None:
     """AgentOrg — Build and run your AI organization."""
+    from agentorg.config import detect_legacy_layout, is_initialized
+
     ctx.ensure_object(dict)
+
+    # Handle legacy layout migration before anything else
+    if not is_initialized() and detect_legacy_layout():
+        _migrate_legacy_layout_interactive()
+
     ctx.obj.update(_build_context())
 
     # Check if init has been done (skip for init itself and ask)
     config = ctx.obj["config"]
-    if ctx.invoked_subcommand not in _INIT_NOT_REQUIRED and not config.settings_file.is_file():
+    needs_init = not is_initialized() or not config.settings_file.is_file()
+    if ctx.invoked_subcommand not in _INIT_NOT_REQUIRED and needs_init:
         click.echo(o.warn("AgentOrg is not initialized. Run 'fleet init' first."))
         click.echo()
         ctx.invoke(init)
+        # After init, rebuild context so downstream commands see fresh config
+        ctx.obj.clear()
+        ctx.obj.update(_build_context())
+        if ctx.invoked_subcommand is None:
+            ctx.invoke(status)
         return
 
     if ctx.invoked_subcommand is None:
         ctx.invoke(status)
+
+
+def _migrate_legacy_layout_interactive() -> None:
+    """Prompt user to migrate a pre-named-org layout into orgs/<name>/."""
+    from agentorg.config import migrate_legacy_to_named_org
+
+    click.echo(o.warn("Legacy layout detected at ~/.agent-org/."))
+    click.echo("AgentOrg now requires every org to have a name.")
+    click.echo()
+    import getpass
+    default_name = _normalize_org_name(getpass.getuser() or "main")
+    name = click.prompt("Name for your existing org", default=default_name)
+    name = _normalize_org_name(name)
+    target = migrate_legacy_to_named_org(name)
+    click.echo(o.success(f"Migrated to: {target}"))
+    click.echo()
+
+
+def _normalize_org_name(name: str) -> str:
+    """Normalize an org name — lowercase, hyphen-separated."""
+    return name.strip().lower().replace(" ", "-")
+
+
+def _env_home_set() -> bool:
+    import os as _os
+    return bool(_os.environ.get("AGENT_ORG_HOME"))
+
+
+def _has_active_org_file() -> bool:
+    from agentorg.config import _active_org_file
+    return _active_org_file().is_file()
+
+
+def _display_org_name() -> str:
+    """Resolve an org name to display. Handles env-override and uninitialized states."""
+    from agentorg.config import get_active_org
+    if _has_active_org_file():
+        try:
+            return get_active_org()
+        except Exception:
+            pass
+    if _env_home_set():
+        return "(env override)"
+    return "(none)"
 
 
 def _build_cli_reference() -> str:
@@ -201,8 +280,6 @@ def ask(ctx: click.Context, query: tuple[str, ...]) -> None:
     config = ctx.obj["config"]
     sync_svc = ctx.obj["sync_service"]
     proj_svc = ctx.obj["project_service"]
-    from agentorg.config import get_active_org
-
     # Build context string
     active_project = proj_svc.get_active()
     context_lines = [
@@ -210,7 +287,7 @@ def ask(ctx: click.Context, query: tuple[str, ...]) -> None:
         f"  backend: {get_active_backend(config)}",
         f"  project: {active_project.id if active_project else '(none)'}",
         f"  reflection: {get_reflection_mode(config).value}",
-        f"  org: {get_active_org() or 'default'}",
+        f"  org: {_display_org_name()}",
     ]
 
     query_str = " ".join(query)
@@ -261,17 +338,45 @@ def ask(ctx: click.Context, query: tuple[str, ...]) -> None:
 @click.pass_context
 def init(ctx: click.Context) -> None:
     """Set up AgentOrg for first use."""
-    from agentorg.config import save_settings
+    from agentorg.config import (
+        is_initialized,
+        save_settings,
+        set_active_org,
+    )
 
     config = ctx.obj["config"]
 
-    if config.settings_file.is_file():
+    # If already initialized with a real org and settings.yaml, bail.
+    if is_initialized() and config.settings_file.is_file():
         click.echo(o.dim(f"Settings already exist: {config.settings_file}"))
         click.echo(o.dim("Use 'fleet config' to view or change settings."))
         return
 
     click.echo(o.bold("Welcome to AgentOrg"))
     click.echo()
+
+    # Prompt for org name (default: username)
+    import getpass
+    default_name = _normalize_org_name(getpass.getuser() or "main")
+    org_name_input = click.prompt(
+        "Name your first org",
+        default=default_name,
+    )
+    org_name = _normalize_org_name(org_name_input)
+
+    # Create the org directory and mark it active BEFORE loading settings,
+    # so the settings file lands in the right place.
+    import os as _os
+    if not _os.environ.get("AGENT_ORG_HOME"):
+        set_active_org(org_name)
+        # Reload config so org_home points to the new org dir
+        config = Config.load()
+        ctx.obj["config"] = config
+
+    if config.settings_file.is_file():
+        click.echo(o.dim(f"Settings already exist: {config.settings_file}"))
+        click.echo(o.dim("Use 'fleet config' to view or change settings."))
+        return
 
     # Detect available backends
     sync_svc = ctx.obj["sync_service"]
@@ -378,12 +483,11 @@ def config_cmd(ctx: click.Context) -> None:
     """View or change settings and active context."""
     if ctx.invoked_subcommand is None:
         config = ctx.obj["config"]
-        from agentorg.config import get_active_org
 
         active_backend = get_active_backend(config)
         proj_svc = ctx.obj["project_service"]
         active_project = proj_svc.get_active()
-        active_org_name = get_active_org()
+        active_org_name = _display_org_name()
         mode = get_reflection_mode(config)
         condense = get_condense_after(config)
         from agentorg.config import get_scratch_dir
@@ -396,8 +500,7 @@ def config_cmd(ctx: click.Context) -> None:
         click.echo(f"  backend:           {o.bold(active_backend)}")
         project_str = o.bold(active_project.id) if active_project else o.dim("(none)")
         click.echo(f"  project:           {project_str}")
-        org_str = o.bold(active_org_name) if active_org_name else o.dim("(default — unnamed)")
-        click.echo(f"  org:               {org_str}")
+        click.echo(f"  org:               {o.bold(active_org_name)}")
         click.echo(f"  reflection:        {mode.value}")
         click.echo(f"  condense_after:    {condense}")
         click.echo(f"  scratch_dir:       {scratch}")
@@ -515,18 +618,13 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
 
 
 @config_cmd.command("clear")
-@click.argument("key", type=click.Choice(["project", "org"]))
+@click.argument("key", type=click.Choice(["project"]))
 @click.pass_context
 def config_clear(ctx: click.Context, key: str) -> None:
-    """Clear a context value (project or org)."""
+    """Clear a context value (project only — orgs are always named)."""
     if key == "project":
         ctx.obj["project_service"].deactivate()
         click.echo(o.success("project cleared — running in one-off mode."))
-    elif key == "org":
-        from agentorg.config import clear_active_org
-        clear_active_org()
-        click.echo(o.success("org cleared — using default org."))
-        click.echo(o.dim("Restart fleet for the change to take effect."))
 
 
 # ── Status ──
@@ -535,20 +633,18 @@ def config_clear(ctx: click.Context, key: str) -> None:
 @click.pass_context
 def status(ctx: click.Context) -> None:
     """Show org status — roles, teams, runs."""
-    from agentorg.config import get_active_org
-
     org = ctx.obj["org_service"]
     s = org.status()
     config = ctx.obj["config"]
 
     active_backend = get_active_backend(config)
-    active_org_name = get_active_org() or "default"
+    active_org_name = _display_org_name()
     mode = get_reflection_mode(config)
 
     proj_svc = ctx.obj["project_service"]
     active_project = proj_svc.get_active()
     project_str = active_project.id if active_project else o.dim("(none)")
-    org_str = o.dim(active_org_name) if active_org_name == "default" else active_org_name
+    org_str = active_org_name
 
     click.echo()
     click.echo(o.bold("AgentOrg"))
@@ -1050,27 +1146,18 @@ def org_use(ctx: click.Context, name: str) -> None:
     click.echo(o.dim(f"Data: {org_dir}"))
 
 
-@org.command("default")
-@click.pass_context
-def org_default(ctx: click.Context) -> None:
-    """Switch back to the default org."""
-    from agentorg.config import clear_active_org
-    clear_active_org()
-    click.echo(o.success("Switched to default org."))
-
-
 @org.command("list")
 @click.pass_context
 def org_list(ctx: click.Context) -> None:
     """List all named orgs."""
-    from agentorg.config import get_active_org, list_orgs
-    active = get_active_org()
+    from agentorg.config import list_orgs
+    active = _display_org_name()
     orgs = list_orgs()
     click.echo()
     click.echo(o.bold("Orgs"))
     click.echo()
-    default_marker = " " + click.style("(active)", fg="green") if not active else ""
-    click.echo(f"  default{default_marker}")
+    if not orgs:
+        click.echo(o.dim("  No orgs yet. Run 'fleet init' to create one."))
     for name in orgs:
         marker = " " + click.style("(active)", fg="green") if name == active else ""
         click.echo(f"  {name}{marker}")
