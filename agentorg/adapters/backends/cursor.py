@@ -36,8 +36,7 @@ class CursorBackend:
         self._contracts_dir = contracts_dir
 
     def _prefix(self) -> str:
-        if self._org_name == "default":
-            return "fleet-"
+        """'fleet-{org}-' — every org is named, so every agent file is prefixed."""
         return f"fleet-{self._org_name}-"
 
     def _agent_filename(self, persona_id: str) -> str:

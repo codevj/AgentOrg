@@ -62,17 +62,18 @@ def _build_context() -> dict:
     from agentorg.adapters.backends.registry import BackendRegistry
 
     # Resolve org_name for backend agent file prefixing.
-    # If AGENT_ORG_HOME env override is set (tests), don't consult the global
-    # .active-org file — treat it as an unnamed/default org context.
+    # When AGENT_ORG_HOME env var is set (tests), use "test" as the org name.
+    # Otherwise read the active org from .active-org.
     import os as _os
     if _os.environ.get("AGENT_ORG_HOME"):
-        org_name = "default"
+        org_name = "test"
     else:
         from agentorg.config import get_active_org
         try:
             org_name = get_active_org()
         except Exception:
-            org_name = "default"
+            # Not initialized yet — init flow will run before any backend use.
+            org_name = "uninitialized"
 
     backend_kwargs = dict(
         org_name=org_name,

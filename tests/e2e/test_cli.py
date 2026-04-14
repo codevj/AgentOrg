@@ -90,8 +90,8 @@ class TestSync:
         assert "Synced" in result.output
         # Check agent files were created in user-level dir with org prefix
         agent_dir = Path.home() / ".claude" / "agents"
-        assert (agent_dir / "fleet-architect.md").is_file()
-        assert (agent_dir / "fleet-product-delivery-lead.md").is_file()
+        assert (agent_dir / "fleet-test-architect.md").is_file()
+        assert (agent_dir / "fleet-test-product-delivery-lead.md").is_file()
 
 
 class TestHire:
