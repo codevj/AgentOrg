@@ -46,42 +46,21 @@ class TestStatus:
 
 
 class TestBackends:
-    def test_list_backends(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["backends"])
+    def test_config_shows_backend(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["config"])
         assert result.exit_code == 0
-        assert "claude" in result.output
-        assert "copilot" in result.output
-        assert "cursor" in result.output
-
-    def test_backends_shows_active_marker(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["backends"])
-        assert result.exit_code == 0
-        # Default is claude, should have the active marker on that line
-        for line in result.output.splitlines():
-            if "claude" in line:
-                assert "<-" in line
-                break
-        else:
-            pytest.fail("claude line not found in backends output")
-
-
-class TestBackendSwitch:
-    def test_backend_shows_active(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["backend"])
-        assert result.exit_code == 0
-        assert "Active backend: " in result.output
+        assert "backend" in result.output
         assert "claude" in result.output
 
-    def test_backend_use_valid(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["backend", "use", "cursor"])
+    def test_config_set_backend_valid(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["config", "set", "backend", "cursor"])
         assert result.exit_code == 0
-        assert "Switched to: cursor" in result.output
-        # Verify it persisted
-        result = runner.invoke(fleet, ["backend"])
+        assert "backend = cursor" in result.output
+        result = runner.invoke(fleet, ["config"])
         assert "cursor" in result.output
 
-    def test_backend_use_invalid(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["backend", "use", "nonexistent"])
+    def test_config_set_backend_invalid(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["config", "set", "backend", "nonexistent"])
         assert result.exit_code != 0
         assert "Unknown backend: nonexistent" in result.output
 
@@ -98,76 +77,90 @@ class TestSync:
         assert (agent_dir / "fleet-testorg-product-delivery-lead.md").is_file()
 
 
-class TestHire:
-    def test_hire_creates_persona(self, runner: CliRunner, tmp_path: Path):
+class TestRole:
+    def test_role_create(self, runner: CliRunner, tmp_path: Path):
         org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
-        result = runner.invoke(fleet, ["hire", "--non-interactive", "sales-rep"])
+        result = runner.invoke(fleet, ["role", "create", "--non-interactive", "sales-rep"])
         assert result.exit_code == 0
         assert "Hired: sales-rep" in result.output
         persona_file = org_home / "personas" / "sales-rep" / "persona.md"
         assert persona_file.is_file()
 
-    def test_hire_duplicate_fails(self, runner: CliRunner):
-        runner.invoke(fleet, ["hire", "--non-interactive", "dup-role"])
-        result = runner.invoke(fleet, ["hire", "--non-interactive", "dup-role"])
+    def test_role_create_duplicate_fails(self, runner: CliRunner):
+        runner.invoke(fleet, ["role", "create", "--non-interactive", "dup-role"])
+        result = runner.invoke(fleet, ["role", "create", "--non-interactive", "dup-role"])
         assert result.exit_code != 0
         assert "already exists" in result.output
 
-    def test_hired_persona_shows_in_status(self, runner: CliRunner):
-        runner.invoke(fleet, ["hire", "--non-interactive", "custom-role"])
-        result = runner.invoke(fleet, ["status"])
-        assert "custom-role" in result.output
+    def test_role_list(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["role", "list"])
+        assert result.exit_code == 0
+        assert "architect" in result.output
+        assert "developer" in result.output
+
+    def test_role_adopt(self, runner: CliRunner, tmp_path: Path):
+        org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
+        result = runner.invoke(fleet, ["role", "adopt", "architect"])
+        assert result.exit_code == 0
+        assert "Adopted: architect" in result.output
+        assert (org_home / "personas" / "architect" / "persona.md").is_file()
+
+    def test_role_adopt_already_user_fails(self, runner: CliRunner):
+        runner.invoke(fleet, ["role", "adopt", "architect"])
+        result = runner.invoke(fleet, ["role", "adopt", "architect"])
+        assert result.exit_code != 0
+        assert "Already in your org" in result.output
+
+    def test_role_remove(self, runner: CliRunner, tmp_path: Path):
+        org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
+        runner.invoke(fleet, ["role", "create", "--non-interactive", "tmp-role"])
+        result = runner.invoke(fleet, ["role", "remove", "--yes", "tmp-role"])
+        assert result.exit_code == 0
+        assert "Removed: tmp-role" in result.output
+        assert not (org_home / "personas" / "tmp-role").exists()
 
 
 class TestTeam:
-    def test_create_team(self, runner: CliRunner, tmp_path: Path):
+    def test_team_create(self, runner: CliRunner, tmp_path: Path):
         org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
-        result = runner.invoke(fleet, ["team", "my-team"])
+        result = runner.invoke(fleet, ["team", "create", "my-team"])
         assert result.exit_code == 0
         assert "Team created: my-team" in result.output
         team_file = org_home / "teams" / "my-team.yaml"
         assert team_file.is_file()
 
-
-class TestInspect:
-    def test_inspect_starter(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["inspect", "architect"])
+    def test_team_list(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["team", "list"])
         assert result.exit_code == 0
-        assert "architect" in result.output
-        assert "risk-assessment" in result.output
         assert "product-delivery" in result.output
 
-    def test_inspect_nonexistent(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["inspect", "nonexistent"])
-        assert result.exit_code != 0
+    def test_team_adopt(self, runner: CliRunner, tmp_path: Path):
+        org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
+        result = runner.invoke(fleet, ["team", "adopt", "product-delivery"])
+        assert result.exit_code == 0
+        assert "Adopted: product-delivery" in result.output
+        assert (org_home / "teams" / "product-delivery.yaml").is_file()
+
+
+class TestDispatcher:
+    def test_fleet_role_name_shows_details(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["architect"])
+        assert result.exit_code == 0
+        assert "architect" in result.output
+        assert "risk-assessment" in result.output or "product-delivery" in result.output
+
+    def test_fleet_team_name_shows_details(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["product-delivery"])
+        assert result.exit_code == 0
+        assert "product-delivery" in result.output
 
 
 class TestOrg:
-    def test_org_roles(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["org", "roles"])
+    def test_org_overview_no_args(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["org"])
         assert result.exit_code == 0
         assert "architect" in result.output
-        assert "developer" in result.output
-
-    def test_org_teams(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["org", "teams"])
-        assert result.exit_code == 0
         assert "product-delivery" in result.output
-
-
-class TestAdopt:
-    def test_adopt_persona(self, runner: CliRunner, tmp_path: Path):
-        org_home = tmp_path / "agent_org_root" / "orgs" / "testorg"
-        result = runner.invoke(fleet, ["adopt", "persona", "architect"])
-        assert result.exit_code == 0
-        assert "Adopted: architect" in result.output
-        assert (org_home / "personas" / "architect" / "persona.md").is_file()
-
-    def test_adopt_already_user_fails(self, runner: CliRunner):
-        runner.invoke(fleet, ["adopt", "persona", "architect"])
-        result = runner.invoke(fleet, ["adopt", "persona", "architect"])
-        assert result.exit_code != 0
-        assert "Already in your org" in result.output
 
 
 class TestRun:
@@ -195,15 +188,15 @@ class TestRun:
         assert "caching layer" in result.output
 
 
-class TestSummon:
-    def test_summon_prompt(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["summon", "--prompt", "architect", "Should we use a queue?"])
+class TestRunRole:
+    def test_run_role_prompt(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["run", "--role", "architect", "--prompt", "Should we use a queue?"])
         assert result.exit_code == 0
         assert "Architect" in result.output
         assert "queue" in result.output
 
-    def test_summon_nonexistent_role(self, runner: CliRunner):
-        result = runner.invoke(fleet, ["summon", "nonexistent-role", "Do something"])
+    def test_run_role_nonexistent(self, runner: CliRunner):
+        result = runner.invoke(fleet, ["run", "--role", "nonexistent-role", "--prompt", "Do something"])
         assert result.exit_code != 0
         assert "not found" in result.output
 

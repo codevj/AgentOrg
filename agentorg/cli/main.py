@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from agentorg.cli import output as o
+from agentorg.domain.models import ItemSource
 from agentorg.config import (
     Config,
     ReflectionMode,
@@ -129,14 +130,18 @@ def _build_context() -> dict:
 
 
 class FleetGroup(click.Group):
-    """Custom group that routes unrecognized commands to the 'ask' handler."""
+    """Custom group that routes unrecognized commands to smart dispatch / ask."""
 
     def resolve_command(self, ctx, args):
         # Try normal command resolution first
         try:
             return super().resolve_command(ctx, args)
         except click.UsageError:
-            # Unrecognized command — treat entire args as a natural language query
+            # Unrecognized command — try smart dispatch (role/team/project/org/skill),
+            # else fall back to natural language via `ask`.
+            if args and len(args) == 1 and not args[0].startswith("-"):
+                # Single-arg form: `fleet <name>` — route to dispatcher.
+                return "_dispatch", self.commands["_dispatch"], args
             return "ask", self.commands["ask"], args
 
 
@@ -403,6 +408,184 @@ def ask(ctx: click.Context, query: tuple[str, ...]) -> None:
     if command.startswith("fleet "):
         command = command[6:]
     click.echo(f"→ fleet {command}")
+
+
+# ── Dispatcher: fleet <name> ──
+
+def _edit_file(path: Path) -> bool:
+    """Open a file in $EDITOR (fall back to nano). Returns True if opened."""
+    import os as _os
+    editor = _os.environ.get("EDITOR") or "nano"
+    try:
+        click.edit(filename=str(path), editor=editor)
+        return True
+    except click.UsageError as e:
+        click.echo(o.error(f"Could not open editor: {e}"), err=True)
+        return False
+
+
+def _show_role_details(ctx: click.Context, role_id: str) -> int:
+    org = ctx.obj["org_service"]
+    data = org.inspect_persona(role_id)
+    if data is None:
+        return 1
+    lc = o.level_color(data["level"])
+    click.echo()
+    level_val = data["level"].value
+    click.echo(f"{o.bold(data['id'])} {click.style(f'[{level_val}]', fg=lc)}")
+    click.echo(o.dim(data["mission"]))
+    click.echo()
+    click.echo(f"  Source: {data['source'].value}")
+    click.echo(f"  Skills: {', '.join(data['skill_ids']) or o.dim('none')}")
+    click.echo(f"  Teams:  {', '.join(data['teams']) or o.dim('none')}")
+    click.echo()
+    if data['has_knowledge'] and data.get('knowledge_preview'):
+        click.echo(o.bold("  Learnings"))
+        for line in data['knowledge_preview'].strip().splitlines():
+            click.echo(f"  {line}")
+    else:
+        click.echo(o.dim("  No learnings yet."))
+    click.echo()
+    return 0
+
+
+def _show_team_details(ctx: click.Context, team_id: str) -> int:
+    build = ctx.obj["build_service"]
+    team = build._teams.get(team_id)
+    if team is None:
+        return 1
+    source = build._teams.source(team_id)
+    click.echo()
+    click.echo(f"{o.bold(team_id)} {o.dim(f'[{team.governance_profile}]')}")
+    click.echo()
+    click.echo(f"  Source:     {source.value}")
+    click.echo(f"  Mode:       {team.mode_default.value}")
+    click.echo(f"  Execution:  {team.execution_profile}")
+    click.echo(f"  Roles:      {' → '.join(team.persona_ids)}")
+    click.echo(f"  Gates:      reviewer={team.gates.reviewer_required} tester={team.gates.tester_required}")
+    click.echo(f"  Budget:     max_calls={team.budget.max_calls} reflection={team.budget.reflection} interactions={team.budget.interactions}")
+    stages = team.execution_stages()
+    if stages:
+        click.echo()
+        click.echo(o.bold("  Stages"))
+        for i, stage in enumerate(stages, 1):
+            marker = "⚡" if len(stage) > 1 else " "
+            click.echo(f"    {i}: {marker} {', '.join(stage)}")
+    click.echo()
+    return 0
+
+
+def _show_project_details(ctx: click.Context, project_id: str) -> int:
+    proj_svc = ctx.obj["project_service"]
+    p = proj_svc.get(project_id)
+    if p is None:
+        return 1
+    active = proj_svc.get_active()
+    is_active = active is not None and active.id == p.id
+    click.echo()
+    marker = " " + click.style("(active)", fg="green") if is_active else ""
+    click.echo(f"{o.bold(p.id)}{marker}")
+    click.echo(o.dim(f"  {p.root}"))
+    click.echo()
+    if p.repo_paths:
+        click.echo(o.bold("  Repos"))
+        for rp in p.repo_paths:
+            click.echo(f"    {rp}")
+    else:
+        click.echo(o.dim("  No repos attached. Use: fleet project add-repo <path>"))
+    click.echo()
+    # Context files
+    context_dir = p.root / "context"
+    if context_dir.is_dir():
+        files = sorted(context_dir.glob("*.md"))
+        if files:
+            click.echo(o.bold("  Context"))
+            for f in files:
+                click.echo(f"    {f.name}")
+            click.echo()
+    tasks_dir = p.root / "tasks"
+    if tasks_dir.is_dir():
+        specs = sorted(tasks_dir.glob("*.md"))
+        if specs:
+            click.echo(o.bold("  Tasks"))
+            for f in specs:
+                click.echo(f"    {f.name}")
+            click.echo()
+    return 0
+
+
+def _show_org_details(ctx: click.Context, name: str) -> int:
+    from agentorg.config import list_orgs
+    orgs = list_orgs()
+    if name not in orgs:
+        return 1
+    active = _display_org_name()
+    marker = " " + click.style("(active)", fg="green") if name == active else ""
+    click.echo()
+    click.echo(f"{o.bold(name)}{marker}")
+    click.echo(o.dim(f"  Switch with: fleet org use {name}"))
+    click.echo()
+    return 0
+
+
+def _show_skill_details(ctx: click.Context, skill_id: str) -> int:
+    skill_repo = ctx.obj["build_service"]._skills
+    persona_repo = ctx.obj["build_service"]._personas
+    s = skill_repo.get(skill_id)
+    if s is None:
+        return 1
+    click.echo()
+    click.echo(o.bold(s.metadata.name or s.id))
+    click.echo(o.dim(s.metadata.description))
+    click.echo()
+    click.echo(s.body)
+    click.echo()
+    click.echo(o.bold("Used by:"))
+    found = False
+    for pid in persona_repo.list_ids():
+        p = persona_repo.get(pid)
+        if p and skill_id in p.skill_ids:
+            click.echo(f"  - {pid}")
+            found = True
+    if not found:
+        click.echo(o.dim(f"  (none — use 'fleet skill add-to-role <persona> {skill_id}')"))
+    click.echo()
+    return 0
+
+
+@fleet.command("_dispatch", hidden=True)
+@click.argument("name", nargs=-1, required=True)
+@click.pass_context
+def _dispatch(ctx: click.Context, name: tuple[str, ...]) -> None:
+    """Smart dispatcher for `fleet <name>` — resolves to role/team/project/org/skill."""
+    target = " ".join(name).strip()
+    build = ctx.obj["build_service"]
+    proj_svc = ctx.obj["project_service"]
+
+    # 1. role
+    if build._personas.exists(target):
+        if _show_role_details(ctx, target) == 0:
+            return
+    # 2. team
+    if build._teams.exists(target):
+        if _show_team_details(ctx, target) == 0:
+            return
+    # 3. project
+    if proj_svc.get(target) is not None:
+        if _show_project_details(ctx, target) == 0:
+            return
+    # 4. org
+    from agentorg.config import list_orgs
+    if target in list_orgs():
+        if _show_org_details(ctx, target) == 0:
+            return
+    # 5. skill
+    if build._skills.exists(target):
+        if _show_skill_details(ctx, target) == 0:
+            return
+
+    # Fall through to natural-language ask
+    ctx.invoke(ask, query=name)
 
 
 # ── Init + Config ──
@@ -752,19 +935,76 @@ def status(ctx: click.Context) -> None:
 # ── Run ──
 
 @fleet.command()
-@click.argument("task", nargs=-1, required=True)
+@click.argument("task", nargs=-1, required=False)
 @click.option("--team", "-t", default=None, help="Team to run through")
+@click.option("--role", "role_id", default=None, help="Single role to execute (replaces 'summon')")
+@click.option("--project", "-p", "project_arg", default=None,
+              help="Project to run in (creates it if missing, cwd as repo path)")
 @click.option("--solo", is_flag=True, help="Single-role execution")
 @click.option("--prompt", "prompt_only", is_flag=True, help="Output the prompt without executing")
 @click.option("--budget", "budget_calls", type=int, default=None,
               help="Override max_calls budget for this run")
 @click.option("--no-reflect", is_flag=True, help="Skip reflection for this run")
+@click.option("--new", "new_spec", default=None,
+              help="Scaffold a task spec in the active project, then run it.")
+@click.option("--no-run", is_flag=True,
+              help="With --new: scaffold only, don't run the task.")
 @click.pass_context
-def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
-        prompt_only: bool, budget_calls: int | None, no_reflect: bool) -> None:
+def run(ctx: click.Context, task: tuple[str, ...], team: str | None, role_id: str | None,
+        project_arg: str | None, solo: bool,
+        prompt_only: bool, budget_calls: int | None, no_reflect: bool,
+        new_spec: str | None, no_run: bool) -> None:
     """Run a task through your org."""
     run_svc = ctx.obj["run_service"]
+
+    # --new: scaffold a task spec in the active project, optionally run it.
+    if new_spec:
+        proj_svc = ctx.obj["project_service"]
+        try:
+            task_file = proj_svc.create_task(new_spec)
+        except ValueError as e:
+            click.echo(o.error(str(e)), err=True)
+            raise SystemExit(1)
+        click.echo(o.success(f"Created: {task_file}"))
+        _edit_file(task_file)
+        if no_run:
+            return
+        if not click.confirm("Run this task now?", default=True):
+            return
+        task = (str(task_file),)
+
+    if not task:
+        click.echo(o.error("Missing task. Usage: fleet run <task> [--role <id>] [--team <id>] [--new <name>]"), err=True)
+        raise SystemExit(1)
+
     task_str = " ".join(task)
+
+    # --role: single-role execution (replaces `fleet summon`).
+    if role_id:
+        proj_svc = ctx.obj["project_service"]
+        active_project = proj_svc.get_active()
+        project_root = active_project.root if active_project else None
+        try:
+            prompt = run_svc.build_summon_prompt(role_id, task_str, project_root=project_root)
+        except ValueError as e:
+            click.echo(o.error(str(e)), err=True)
+            raise SystemExit(1)
+        if prompt_only:
+            click.echo(prompt)
+            return
+        backend_name = get_active_backend(ctx.obj["config"])
+        sync_svc = ctx.obj["sync_service"]
+        b = sync_svc.get_backend(backend_name)
+        if b is None:
+            click.echo(o.error(f"Backend not found: {backend_name}"), err=True)
+            raise SystemExit(1)
+        try:
+            output = b.execute("summon", prompt, "summon")
+        except RuntimeError as e:
+            click.echo(o.error(f"Execution failed: {e}"), err=True)
+            raise SystemExit(1)
+        click.echo(output)
+        return
 
     # If the task is a file path, read its content as the task
     task_path = Path(task_str)
@@ -786,9 +1026,22 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
             interactions=base.get("interactions", 3),
         )
 
-    # Resolve active project
+    # Resolve project: --project arg wins; else the active project.
+    # If --project names one that doesn't exist, create it with cwd as the repo.
     proj_svc = ctx.obj["project_service"]
-    active_project = proj_svc.get_active()
+    if project_arg:
+        proj = proj_svc.get(project_arg)
+        if proj is None:
+            click.echo(o.dim(f"Project '{project_arg}' not found — creating with {Path.cwd()} as repo path..."), err=True)
+            try:
+                proj = proj_svc.create(project_arg, repo_path=Path.cwd())
+                click.echo(o.success(f"Created project: {project_arg}"), err=True)
+            except ValueError as e:
+                click.echo(o.error(str(e)), err=True)
+                raise SystemExit(1)
+        active_project = proj
+    else:
+        active_project = proj_svc.get_active()
     project_root = active_project.root if active_project else None
     project_id = active_project.id if active_project else None
 
@@ -873,94 +1126,6 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
         click.echo(o.success("Run complete.") + f" {o.dim(result.budget_summary)}", err=True)
 
 
-# ── Summon ──
-
-@fleet.command()
-@click.argument("role")
-@click.argument("task", nargs=-1, required=True)
-@click.option("--prompt", "prompt_only", is_flag=True, help="Output the prompt without executing")
-@click.pass_context
-def summon(ctx: click.Context, role: str, task: tuple[str, ...], prompt_only: bool) -> None:
-    """Summon a single role for a quick task."""
-    run_svc = ctx.obj["run_service"]
-    task_str = " ".join(task)
-
-    # Resolve active project
-    proj_svc = ctx.obj["project_service"]
-    active_project = proj_svc.get_active()
-    project_root = active_project.root if active_project else None
-
-    try:
-        prompt = run_svc.build_summon_prompt(role, task_str, project_root=project_root)
-    except ValueError as e:
-        click.echo(o.error(str(e)), err=True)
-        raise SystemExit(1)
-
-    if prompt_only:
-        click.echo(prompt)
-    else:
-        backend_name = get_active_backend(ctx.obj["config"])
-        sync_svc = ctx.obj["sync_service"]
-        b = sync_svc.get_backend(backend_name)
-        if b is None:
-            click.echo(o.error(f"Backend not found: {backend_name}"), err=True)
-            raise SystemExit(1)
-        try:
-            output = b.execute("summon", prompt, "summon")
-        except RuntimeError as e:
-            click.echo(o.error(f"Execution failed: {e}"), err=True)
-            raise SystemExit(1)
-        click.echo(output)
-
-
-# ── Build ──
-
-@fleet.command()
-@click.argument("role_id")
-@click.option("--non-interactive", is_flag=True, help="Skip prompts, use template defaults")
-@click.pass_context
-def hire(ctx: click.Context, role_id: str, non_interactive: bool) -> None:
-    """Create a new role in your local org."""
-    build = ctx.obj["build_service"]
-    try:
-        if non_interactive:
-            p = build.hire(role_id)
-        else:
-            mission = click.prompt("What is this role's mission? (one sentence)", default="")
-            required_inputs = click.prompt("What inputs does this role need? (comma-separated)", default="")
-            exit_criteria = click.prompt("When is this role done? (comma-separated)", default="")
-            non_goals = click.prompt("What should this role NOT do? (comma-separated)", default="")
-
-            p = build.hire_interactive(
-                role_id,
-                mission=mission,
-                required_inputs=[x.strip() for x in required_inputs.split(",") if x.strip()],
-                exit_criteria=[x.strip() for x in exit_criteria.split(",") if x.strip()],
-                non_goals=[x.strip() for x in non_goals.split(",") if x.strip()],
-            )
-
-        click.echo(o.success(f"Hired: {role_id}"))
-        click.echo(o.dim(f"Stored at: {ctx.obj['config'].user_personas_dir / role_id}"))
-    except ValueError as e:
-        click.echo(o.error(str(e)), err=True)
-        raise SystemExit(1)
-
-
-@fleet.command("team")
-@click.argument("team_id")
-@click.pass_context
-def create_team(ctx: click.Context, team_id: str) -> None:
-    """Create a new team in your local org."""
-    build = ctx.obj["build_service"]
-    try:
-        build.create_team(team_id)
-        click.echo(o.success(f"Team created: {team_id}"))
-        click.echo(o.dim(f"Stored at: {ctx.obj['config'].user_teams_dir / f'{team_id}.yaml'}"))
-    except ValueError as e:
-        click.echo(o.error(str(e)), err=True)
-        raise SystemExit(1)
-
-
 # ── Skills ──
 
 @fleet.group(invoke_without_command=True)
@@ -987,65 +1152,6 @@ def skill_list(ctx: click.Context) -> None:
     click.echo()
 
 
-@skill.command("show")
-@click.argument("skill_id")
-@click.pass_context
-def skill_show(ctx: click.Context, skill_id: str) -> None:
-    """Show skill details and which roles use it."""
-    skill_repo = ctx.obj["build_service"]._skills
-    persona_repo = ctx.obj["build_service"]._personas
-    s = skill_repo.get(skill_id)
-    if s is None:
-        click.echo(o.error(f"Skill not found: {skill_id}"), err=True)
-        raise SystemExit(1)
-    click.echo()
-    click.echo(o.bold(s.metadata.name or s.id))
-    click.echo(o.dim(s.metadata.description))
-    click.echo()
-    click.echo(s.body)
-    click.echo()
-    click.echo(o.bold("Used by:"))
-    found = False
-    for pid in persona_repo.list_ids():
-        p = persona_repo.get(pid)
-        if p and skill_id in p.skill_ids:
-            click.echo(f"  - {pid}")
-            found = True
-    if not found:
-        click.echo(o.dim(f"  (none — use 'fleet skill add <persona> {skill_id}')"))
-    click.echo()
-
-
-@skill.command("add")
-@click.argument("persona_id")
-@click.argument("skill_id")
-@click.pass_context
-def skill_add(ctx: click.Context, persona_id: str, skill_id: str) -> None:
-    """Give a skill to a role."""
-    build = ctx.obj["build_service"]
-    try:
-        build.add_skill_to_persona(persona_id, skill_id)
-        click.echo(o.success(f"Added '{skill_id}' to {persona_id}"))
-    except ValueError as e:
-        click.echo(o.error(str(e)), err=True)
-        raise SystemExit(1)
-
-
-@skill.command("remove")
-@click.argument("persona_id")
-@click.argument("skill_id")
-@click.pass_context
-def skill_remove(ctx: click.Context, persona_id: str, skill_id: str) -> None:
-    """Remove a skill from a role."""
-    build = ctx.obj["build_service"]
-    try:
-        build.remove_skill_from_persona(persona_id, skill_id)
-        click.echo(o.success(f"Removed '{skill_id}' from {persona_id}"))
-    except ValueError as e:
-        click.echo(o.error(str(e)), err=True)
-        raise SystemExit(1)
-
-
 @skill.command("create")
 @click.argument("skill_id")
 @click.pass_context
@@ -1061,88 +1167,111 @@ def skill_create(ctx: click.Context, skill_id: str) -> None:
         raise SystemExit(1)
 
 
-# ── Adopt + Contribute ──
-
-@fleet.command()
-@click.argument("item_type", type=click.Choice(["persona", "team", "skill"]))
-@click.argument("item_id")
+@skill.command("edit")
+@click.argument("skill_id")
 @click.pass_context
-def adopt(ctx: click.Context, item_type: str, item_id: str) -> None:
-    """Copy a starter to your local org for customization."""
+def skill_edit(ctx: click.Context, skill_id: str) -> None:
+    """Open a skill's SKILL.md in $EDITOR."""
+    config = ctx.obj["config"]
+    build = ctx.obj["build_service"]
+    if not build._skills.exists(skill_id):
+        click.echo(o.error(f"Skill not found: {skill_id}"), err=True)
+        raise SystemExit(1)
+    # Prefer user-level file; if starter-only, adopt by copying first.
+    user_path = config.user_skills_dir / skill_id / "SKILL.md"
+    if not user_path.is_file():
+        starter_path = config.starter_skills_dir / skill_id / "SKILL.md"
+        if starter_path.is_file():
+            user_path.parent.mkdir(parents=True, exist_ok=True)
+            user_path.write_text(starter_path.read_text())
+            click.echo(o.dim(f"Copied starter to your org for editing: {user_path}"), err=True)
+    _edit_file(user_path)
+
+
+@skill.command("remove")
+@click.argument("skill_id")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def skill_delete(ctx: click.Context, skill_id: str, yes: bool) -> None:
+    """Remove a skill from your local org (starters untouched)."""
+    import shutil
+    config = ctx.obj["config"]
+    user_dir = config.user_skills_dir / skill_id
+    if not user_dir.is_dir():
+        click.echo(o.error(f"Skill not in your org: {skill_id}"), err=True)
+        raise SystemExit(1)
+    if not yes and not click.confirm(f"Remove skill '{skill_id}' from your org?"):
+        click.echo("Aborted.")
+        return
+    shutil.rmtree(user_dir)
+    click.echo(o.success(f"Removed: {skill_id}"))
+
+
+@skill.command("add-to-role")
+@click.argument("role_id")
+@click.argument("skill_id")
+@click.pass_context
+def skill_add_to_role(ctx: click.Context, role_id: str, skill_id: str) -> None:
+    """Attach a skill to a role."""
     build = ctx.obj["build_service"]
     try:
-        if item_type == "persona":
-            build.adopt_persona(item_id)
-        elif item_type == "team":
-            build.adopt_team(item_id)
-        click.echo(o.success(f"Adopted: {item_id}"))
-        click.echo(o.dim("Edit to customize. Your version takes priority over the starter."))
+        build.add_skill_to_persona(role_id, skill_id)
+        click.echo(o.success(f"Added '{skill_id}' to {role_id}"))
     except ValueError as e:
         click.echo(o.error(str(e)), err=True)
         raise SystemExit(1)
 
 
-@fleet.command()
-@click.argument("item_type", type=click.Choice(["persona", "team", "skill"]))
-@click.argument("item_id")
+@skill.command("remove-from-role")
+@click.argument("role_id")
+@click.argument("skill_id")
 @click.pass_context
-def contribute(ctx: click.Context, item_type: str, item_id: str) -> None:
-    """Copy from your local org to the repo for sharing."""
+def skill_remove_from_role(ctx: click.Context, role_id: str, skill_id: str) -> None:
+    """Detach a skill from a role."""
     build = ctx.obj["build_service"]
     try:
-        if item_type == "persona":
-            build.contribute_persona(item_id)
-        elif item_type == "team":
-            build.contribute_team(item_id)
-        elif item_type == "skill":
-            build.contribute_skill(item_id)
-        click.echo(o.success(f"Contributed: {item_id}"))
+        build.remove_skill_from_persona(role_id, skill_id)
+        click.echo(o.success(f"Removed '{skill_id}' from {role_id}"))
+    except ValueError as e:
+        click.echo(o.error(str(e)), err=True)
+        raise SystemExit(1)
+
+
+@skill.command("adopt")
+@click.argument("skill_id")
+@click.pass_context
+def skill_adopt(ctx: click.Context, skill_id: str) -> None:
+    """Copy a starter skill to your org for editing."""
+    build = ctx.obj["build_service"]
+    config = ctx.obj["config"]
+    if build._skills.source(skill_id) == ItemSource.USER:
+        click.echo(o.error(f"Already in your org: {skill_id}"), err=True)
+        raise SystemExit(1)
+    s = build._skills.get(skill_id)
+    if s is None:
+        click.echo(o.error(f"Starter not found: {skill_id}"), err=True)
+        raise SystemExit(1)
+    build._skills.save_to_user(s)
+    click.echo(o.success(f"Adopted: {skill_id}"))
+    click.echo(o.dim(f"Stored at: {config.user_skills_dir / skill_id}"))
+
+
+@skill.command("contribute")
+@click.argument("skill_id")
+@click.pass_context
+def skill_contribute(ctx: click.Context, skill_id: str) -> None:
+    """Copy a skill from your org to the repo for sharing."""
+    build = ctx.obj["build_service"]
+    try:
+        build.contribute_skill(skill_id)
+        click.echo(o.success(f"Contributed: {skill_id}"))
         click.echo(o.dim("Now commit to share with your team."))
     except ValueError as e:
         click.echo(o.error(str(e)), err=True)
         raise SystemExit(1)
 
 
-# ── Backends + Sync ──
-
-@fleet.command()
-@click.pass_context
-def backends(ctx: click.Context) -> None:
-    """List available backends and their status."""
-    sync_svc = ctx.obj["sync_service"]
-    active = get_active_backend(ctx.obj["config"])
-    click.echo()
-    click.echo(o.bold("Backends"))
-    click.echo()
-    for info in sync_svc.list_backends():
-        marker = click.style(" <-", fg="green") if info.name == active else ""
-        status_str = click.style("[installed]", fg="green") if info.installed else click.style("[not installed]", fg="red")
-        click.echo(f"  {o.bold(info.name):<20} {status_str:<25} {o.dim(info.description)}{marker}")
-    click.echo()
-
-
-@fleet.group(invoke_without_command=True, name="backend")
-@click.pass_context
-def backend_group(ctx: click.Context) -> None:
-    """View or switch the active backend."""
-    if ctx.invoked_subcommand is None:
-        name = get_active_backend(ctx.obj["config"])
-        click.echo(f"Active backend: {o.bold(name)}")
-
-
-@backend_group.command("use")
-@click.argument("name")
-@click.pass_context
-def backend_use(ctx: click.Context, name: str) -> None:
-    """Switch the active backend."""
-    sync_svc = ctx.obj["sync_service"]
-    known = [info.name for info in sync_svc.list_backends()]
-    if name not in known:
-        click.echo(o.error(f"Unknown backend: {name}. Available: {', '.join(known)}"), err=True)
-        raise SystemExit(1)
-    set_active_backend(ctx.obj["config"], name)
-    click.echo(o.success(f"Switched to: {name}"))
-
+# ── Sync ──
 
 @fleet.command()
 @click.argument("team_id", required=False)
@@ -1163,99 +1292,60 @@ def sync(ctx: click.Context, team_id: str | None) -> None:
         raise SystemExit(1)
 
 
-# ── Inspect ──
-
-@fleet.command()
-@click.argument("role_id")
-@click.pass_context
-def inspect(ctx: click.Context, role_id: str) -> None:
-    """Detailed view of a role."""
-    org = ctx.obj["org_service"]
-    data = org.inspect_persona(role_id)
-    if data is None:
-        click.echo(o.error(f"Persona not found: {role_id}"), err=True)
-        raise SystemExit(1)
-
-    lc = o.level_color(data["level"])
-    click.echo()
-    level_val = data["level"].value
-    click.echo(f"{o.bold(data['id'])} {click.style(f'[{level_val}]', fg=lc)}")
-    click.echo(o.dim(data["mission"]))
-    click.echo()
-    click.echo(f"  Source: {data['source'].value}")
-    click.echo(f"  Skills: {', '.join(data['skill_ids']) or o.dim('none')}")
-    click.echo(f"  Teams:  {', '.join(data['teams']) or o.dim('none')}")
-    click.echo()
-    if data['has_knowledge'] and data.get('knowledge_preview'):
-        click.echo(o.bold("  Learnings"))
-        for line in data['knowledge_preview'].strip().splitlines():
-            click.echo(f"  {line}")
-    else:
-        click.echo(o.dim("  No learnings yet."))
-    click.echo()
-
-
 # ── Org ──
 
-@fleet.group(invoke_without_command=True)
-@click.pass_context
-def org(ctx: click.Context) -> None:
-    """View your organization."""
-    if ctx.invoked_subcommand is None:
-        ctx.invoke(status)
-
-
-@org.command("roles")
-@click.pass_context
-def org_roles(ctx: click.Context) -> None:
-    """List all roles."""
+def _print_roles_section(ctx: click.Context) -> None:
     org_svc = ctx.obj["org_service"]
-    click.echo()
     click.echo(o.bold("Roles"))
     for pv in org_svc.list_personas():
         lc = o.level_color(pv.level)
         click.echo(f"  {o.bold(pv.id):<30} {click.style(f'[{pv.level.value}]', fg=lc):<20}{o.source_tag(pv.source)} {o.dim(pv.mission)}")
-    click.echo()
 
 
-@org.command("teams")
-@click.pass_context
-def org_teams(ctx: click.Context) -> None:
-    """List all teams."""
+def _print_teams_section(ctx: click.Context) -> None:
     org_svc = ctx.obj["org_service"]
-    click.echo()
     click.echo(o.bold("Teams"))
     for tv in org_svc.list_teams():
         click.echo(f"  {o.bold(tv.id):<30} {o.dim(f'[{tv.governance_profile}]'):<20} {' '.join(tv.persona_ids)}{o.source_tag(tv.source)}")
-    click.echo()
 
 
-@org.command("history")
-@click.pass_context
-def org_history(ctx: click.Context) -> None:
-    """View recent runs."""
+def _print_history_section(ctx: click.Context) -> None:
     run_store = ctx.obj["run_service"]._runs
     runs = run_store.list_recent(count=10)
-    click.echo()
     click.echo(o.bold("Run History"))
-    click.echo()
     if not runs:
         click.echo(o.dim("  No runs yet."))
     else:
         for run in runs:
             team_str = run.team_id or "solo"
             click.echo(f"  {o.dim(run.id):<30} {team_str:<22} {run.status.value}")
-    click.echo()
 
 
-@org.command("use")
+@fleet.group(invoke_without_command=True)
+@click.pass_context
+def org(ctx: click.Context) -> None:
+    """Manage organizations (overview shows roles, teams, and recent runs)."""
+    if ctx.invoked_subcommand is None:
+        click.echo()
+        click.echo(o.bold(f"Org: {_display_org_name()}"))
+        click.echo()
+        _print_roles_section(ctx)
+        click.echo()
+        _print_teams_section(ctx)
+        click.echo()
+        _print_history_section(ctx)
+        click.echo()
+
+
+@org.command("create")
 @click.argument("name")
 @click.pass_context
-def org_use(ctx: click.Context, name: str) -> None:
-    """Switch to a named org (e.g., 'personal', 'work')."""
+def org_create(ctx: click.Context, name: str) -> None:
+    """Create a new org (and switch to it)."""
     from agentorg.config import set_active_org
-    org_dir = set_active_org(name)
-    click.echo(o.success(f"Switched to org: {name}"))
+    normalized = _normalize_org_name(name)
+    org_dir = set_active_org(normalized)
+    click.echo(o.success(f"Created and switched to org: {normalized}"))
     click.echo(o.dim(f"Data: {org_dir}"))
 
 
@@ -1274,6 +1364,61 @@ def org_list(ctx: click.Context) -> None:
     for name in orgs:
         marker = " " + click.style("(active)", fg="green") if name == active else ""
         click.echo(f"  {name}{marker}")
+    click.echo()
+
+
+@org.command("edit")
+@click.argument("name")
+@click.pass_context
+def org_edit(ctx: click.Context, name: str) -> None:
+    """Open the org's settings.yaml in $EDITOR."""
+    from agentorg.config import _root_dir
+    settings_path = _root_dir() / "orgs" / name / "settings.yaml"
+    if not settings_path.is_file():
+        click.echo(o.error(f"Org settings not found: {settings_path}"), err=True)
+        raise SystemExit(1)
+    _edit_file(settings_path)
+
+
+@org.command("use")
+@click.argument("name")
+@click.pass_context
+def org_use(ctx: click.Context, name: str) -> None:
+    """Switch to a named org."""
+    from agentorg.config import set_active_org
+    org_dir = set_active_org(name)
+    click.echo(o.success(f"Switched to org: {name}"))
+    click.echo(o.dim(f"Data: {org_dir}"))
+
+
+@org.command("remove")
+@click.argument("name")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def org_remove(ctx: click.Context, name: str, yes: bool) -> None:
+    """Delete an org directory (irreversible)."""
+    import shutil
+    from agentorg.config import _root_dir
+    org_dir = _root_dir() / "orgs" / name
+    if not org_dir.is_dir():
+        click.echo(o.error(f"Org not found: {name}"), err=True)
+        raise SystemExit(1)
+    if name == _display_org_name():
+        click.echo(o.error(f"Cannot remove active org: {name}. Switch first."), err=True)
+        raise SystemExit(1)
+    if not yes and not click.confirm(f"Remove org '{name}' and all its data at {org_dir}?"):
+        click.echo("Aborted.")
+        return
+    shutil.rmtree(org_dir)
+    click.echo(o.success(f"Removed org: {name}"))
+
+
+@org.command("history")
+@click.pass_context
+def org_history(ctx: click.Context) -> None:
+    """View recent runs."""
+    click.echo()
+    _print_history_section(ctx)
     click.echo()
 
 
@@ -1354,20 +1499,39 @@ def project_add_repo(ctx: click.Context, repo_path: str) -> None:
         raise SystemExit(1)
 
 
-@project.command("task")
-@click.argument("task_name")
+@project.command("edit")
+@click.argument("project_id")
 @click.pass_context
-def project_task(ctx: click.Context, task_name: str) -> None:
-    """Scaffold a task spec in the active project."""
+def project_edit(ctx: click.Context, project_id: str) -> None:
+    """Open the project's project.yaml in $EDITOR."""
     proj_svc = ctx.obj["project_service"]
-    try:
-        task_file = proj_svc.create_task(task_name)
-        click.echo(o.success(f"Created: {task_file}"))
-        click.echo(o.dim("Edit the spec, then run:"))
-        click.echo(f"  fleet run --team product-delivery {task_file}")
-    except ValueError as e:
-        click.echo(o.error(str(e)), err=True)
+    p = proj_svc.get(project_id)
+    if p is None:
+        click.echo(o.error(f"Project not found: {project_id}"), err=True)
         raise SystemExit(1)
+    _edit_file(p.root / "project.yaml")
+
+
+@project.command("remove")
+@click.argument("project_id")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def project_remove(ctx: click.Context, project_id: str, yes: bool) -> None:
+    """Delete a project (its directory in your org; repo code is untouched)."""
+    import shutil
+    proj_svc = ctx.obj["project_service"]
+    p = proj_svc.get(project_id)
+    if p is None:
+        click.echo(o.error(f"Project not found: {project_id}"), err=True)
+        raise SystemExit(1)
+    if not yes and not click.confirm(f"Remove project '{project_id}' at {p.root}?"):
+        click.echo("Aborted.")
+        return
+    active = proj_svc.get_active()
+    if active and active.id == project_id:
+        proj_svc.deactivate()
+    shutil.rmtree(p.root)
+    click.echo(o.success(f"Removed: {project_id}"))
 
 
 @project.command("clear")
@@ -1392,6 +1556,220 @@ def project_list(ctx: click.Context) -> None:
     for p in projects:
         marker = " " + click.style("(active)", fg="green") if active and p.id == active.id else ""
         click.echo(f"  {o.bold(p.id)}{marker}")
+
+
+# ── Role group ──
+
+@fleet.group(invoke_without_command=True)
+@click.pass_context
+def role(ctx: click.Context) -> None:
+    """Manage roles (personas)."""
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(role_list)
+
+
+@role.command("list")
+@click.pass_context
+def role_list(ctx: click.Context) -> None:
+    """List all roles."""
+    click.echo()
+    _print_roles_section(ctx)
+    click.echo()
+
+
+@role.command("create")
+@click.argument("role_id")
+@click.option("--non-interactive", is_flag=True, help="Skip prompts, use template defaults")
+@click.pass_context
+def role_create(ctx: click.Context, role_id: str, non_interactive: bool) -> None:
+    """Create a new role in your org."""
+    build = ctx.obj["build_service"]
+    try:
+        if non_interactive:
+            build.hire(role_id)
+        else:
+            mission = click.prompt("What is this role's mission? (one sentence)", default="")
+            required_inputs = click.prompt("What inputs does this role need? (comma-separated)", default="")
+            exit_criteria = click.prompt("When is this role done? (comma-separated)", default="")
+            non_goals = click.prompt("What should this role NOT do? (comma-separated)", default="")
+            build.hire_interactive(
+                role_id,
+                mission=mission,
+                required_inputs=[x.strip() for x in required_inputs.split(",") if x.strip()],
+                exit_criteria=[x.strip() for x in exit_criteria.split(",") if x.strip()],
+                non_goals=[x.strip() for x in non_goals.split(",") if x.strip()],
+            )
+        click.echo(o.success(f"Hired: {role_id}"))
+        click.echo(o.dim(f"Stored at: {ctx.obj['config'].user_personas_dir / role_id}"))
+    except ValueError as e:
+        click.echo(o.error(str(e)), err=True)
+        raise SystemExit(1)
+
+
+@role.command("edit")
+@click.argument("role_id")
+@click.pass_context
+def role_edit(ctx: click.Context, role_id: str) -> None:
+    """Open a role's persona.md in $EDITOR. Copies starter to your org if needed."""
+    config = ctx.obj["config"]
+    build = ctx.obj["build_service"]
+    if not build._personas.exists(role_id):
+        click.echo(o.error(f"Role not found: {role_id}"), err=True)
+        raise SystemExit(1)
+    user_path = config.user_personas_dir / role_id / "persona.md"
+    if not user_path.is_file():
+        # Adopt the starter so the user edits their own copy.
+        build.adopt_persona_if_missing(role_id)
+        click.echo(o.dim(f"Copied starter to your org for editing: {user_path}"), err=True)
+    _edit_file(user_path)
+
+
+@role.command("remove")
+@click.argument("role_id")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def role_remove(ctx: click.Context, role_id: str, yes: bool) -> None:
+    """Remove a role from your local org (starters are never touched)."""
+    import shutil
+    config = ctx.obj["config"]
+    user_dir = config.user_personas_dir / role_id
+    if not user_dir.is_dir():
+        click.echo(o.error(f"Role not in your org: {role_id}"), err=True)
+        raise SystemExit(1)
+    if not yes and not click.confirm(f"Remove role '{role_id}' from your org?"):
+        click.echo("Aborted.")
+        return
+    shutil.rmtree(user_dir)
+    click.echo(o.success(f"Removed: {role_id}"))
+
+
+@role.command("adopt")
+@click.argument("role_id")
+@click.pass_context
+def role_adopt(ctx: click.Context, role_id: str) -> None:
+    """Copy a starter role to your org for customization."""
+    build = ctx.obj["build_service"]
+    try:
+        build.adopt_persona(role_id)
+        click.echo(o.success(f"Adopted: {role_id}"))
+        click.echo(o.dim("Edit to customize. Your version takes priority over the starter."))
+    except ValueError as e:
+        click.echo(o.error(str(e)), err=True)
+        raise SystemExit(1)
+
+
+@role.command("contribute")
+@click.argument("role_id")
+@click.pass_context
+def role_contribute(ctx: click.Context, role_id: str) -> None:
+    """Copy a role from your org to the repo for sharing."""
+    build = ctx.obj["build_service"]
+    try:
+        build.contribute_persona(role_id)
+        click.echo(o.success(f"Contributed: {role_id}"))
+        click.echo(o.dim("Now commit to share with your team."))
+    except ValueError as e:
+        click.echo(o.error(str(e)), err=True)
+        raise SystemExit(1)
+
+
+# ── Team group ──
+
+@fleet.group(invoke_without_command=True)
+@click.pass_context
+def team(ctx: click.Context) -> None:
+    """Manage teams."""
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(team_list)
+
+
+@team.command("list")
+@click.pass_context
+def team_list(ctx: click.Context) -> None:
+    """List all teams."""
+    click.echo()
+    _print_teams_section(ctx)
+    click.echo()
+
+
+@team.command("create")
+@click.argument("team_id")
+@click.pass_context
+def team_create(ctx: click.Context, team_id: str) -> None:
+    """Create a new team in your org."""
+    build = ctx.obj["build_service"]
+    try:
+        build.create_team(team_id)
+        click.echo(o.success(f"Team created: {team_id}"))
+        click.echo(o.dim(f"Stored at: {ctx.obj['config'].user_teams_dir / f'{team_id}.yaml'}"))
+    except ValueError as e:
+        click.echo(o.error(str(e)), err=True)
+        raise SystemExit(1)
+
+
+@team.command("edit")
+@click.argument("team_id")
+@click.pass_context
+def team_edit(ctx: click.Context, team_id: str) -> None:
+    """Open a team's YAML in $EDITOR. Copies starter to your org if needed."""
+    config = ctx.obj["config"]
+    build = ctx.obj["build_service"]
+    if not build._teams.exists(team_id):
+        click.echo(o.error(f"Team not found: {team_id}"), err=True)
+        raise SystemExit(1)
+    user_path = config.user_teams_dir / f"{team_id}.yaml"
+    if not user_path.is_file():
+        build.adopt_team_if_missing(team_id)
+        click.echo(o.dim(f"Copied starter to your org for editing: {user_path}"), err=True)
+    _edit_file(user_path)
+
+
+@team.command("remove")
+@click.argument("team_id")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def team_remove(ctx: click.Context, team_id: str, yes: bool) -> None:
+    """Remove a team from your local org."""
+    config = ctx.obj["config"]
+    user_path = config.user_teams_dir / f"{team_id}.yaml"
+    if not user_path.is_file():
+        click.echo(o.error(f"Team not in your org: {team_id}"), err=True)
+        raise SystemExit(1)
+    if not yes and not click.confirm(f"Remove team '{team_id}' from your org?"):
+        click.echo("Aborted.")
+        return
+    user_path.unlink()
+    click.echo(o.success(f"Removed: {team_id}"))
+
+
+@team.command("adopt")
+@click.argument("team_id")
+@click.pass_context
+def team_adopt(ctx: click.Context, team_id: str) -> None:
+    """Copy a starter team to your org for customization."""
+    build = ctx.obj["build_service"]
+    try:
+        build.adopt_team(team_id)
+        click.echo(o.success(f"Adopted: {team_id}"))
+        click.echo(o.dim("Edit to customize. Your version takes priority over the starter."))
+    except ValueError as e:
+        click.echo(o.error(str(e)), err=True)
+        raise SystemExit(1)
+
+
+@team.command("contribute")
+@click.argument("team_id")
+@click.pass_context
+def team_contribute(ctx: click.Context, team_id: str) -> None:
+    """Copy a team from your org to the repo for sharing."""
+    build = ctx.obj["build_service"]
+    try:
+        build.contribute_team(team_id)
+        click.echo(o.success(f"Contributed: {team_id}"))
+        click.echo(o.dim("Now commit to share with your team."))
+    except ValueError as e:
+        click.echo(o.error(str(e)), err=True)
+        raise SystemExit(1)
 
 
 # ── Reflect ──

@@ -42,143 +42,30 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync && uv pip install -e .
 ```
 
-## Get started
+## Quick start
 
 ```bash
-# 1. Initialize (required — all other commands need this first)
+# 1. Install and initialize (one time)
+uv sync && uv pip install -e .
 fleet init
-```
 
-```
-Welcome to AgentOrg
-
-Detected backends:
-  + claude — Claude Code — native agent teams
-  + cursor — Cursor — native subagent support
-  - copilot (not installed)
-
-Backend: claude
-Default team [product-delivery]:
-Reflection mode (auto, review, off) [auto]:
-
-AgentOrg initialized.
-  Backend: claude
-
-Next:
-  fleet run "your task"
-```
-
-```bash
-# 2. Run a task
+# 2a. Run a task directly — uses active team + scratch dir
 fleet run "Add a /health endpoint"
+
+# 2b. Run in a specific project — creates the project if missing
+fleet run --project my-api "Add rate limiting"
+
+# 2c. Write a detailed spec, then run it
+fleet run --new "rate limiting"     # scaffolds a spec, opens in $EDITOR,
+                                    # runs after you save
 ```
 
-That's it. `fleet run` uses your default team and backend, syncs agents automatically, and executes. Override the team per-run with `--team <id>`, or change the default with `fleet config set team <id>` — see [Context switches](#context-switches). For Claude Code, agents land in `~/.claude/agents/` — available in every project you open.
+That's it. `fleet run` is the one verb you need. Everything else is
+configuration or building your org.
 
-After the run, `fleet` shows your current context:
-
-```
-AgentOrg
-
-  Backend: claude    Project: (none)    Reflection: auto
-
-  Roles: 19    Teams: 6    Skills: 4    Runs: 1
-
-Teams
-  product-delivery       program-manager architect developer tester code-reviewer
-  content-production     researcher writer editor fact-checker
-  ...
-
-Roles
-  architect              [starter]  [1 skills]  Produce a minimal, safe implementation design.
-  developer              [starter]              Implement approved design with minimal scoped changes.
-  ...
-```
-
----
-
-## Three ways to give work
-
-### 1. Quick task — a sentence
-
-```bash
-fleet run "Add a /health endpoint that returns uptime and version"
-```
-
-Good for small, obvious work. Agents are synced automatically before execution.
-
-### 2. Task spec — a markdown file
-
-For features with scope, constraints, or acceptance criteria, scaffold a spec:
-
-```bash
-fleet project task "add rate limiting"
-```
-
-This creates a task spec with the right sections:
-
-```
-Created: ~/.agent-org/projects/my-api/tasks/add-rate-limiting.md
-Edit the spec, then run:
-  fleet run ~/.agent-org/projects/my-api/tasks/add-rate-limiting.md
-```
-
-The scaffolded spec looks like:
-
-```markdown
-# Task: Add Rate Limiting
-
-## Problem
-What's wrong or missing? Why does this matter?
-
-## Solution
-What should be built? High-level approach.
-
-## Rabbit Holes
-- Things to avoid or not over-engineer
-
-## No-gos
-- Hard boundaries — what must NOT change
-
-## Acceptance Criteria
-- [ ] First criterion
-- [ ] Second criterion
-
-## Validation Commands
-```bash
-# Commands the tester should run
-```
-```
-
-Fill it in and run:
-
-```bash
-fleet run ~/.agent-org/projects/my-api/tasks/add-rate-limiting.md
-```
-
-Each section shapes a different role. Architect respects Rabbit Holes. Developer respects No-gos. Tester checks Acceptance Criteria. Reviewer verifies Validation Commands passed.
-
-### 3. Project — persistent codebase context
-
-If you run many tasks against the same codebase, set up a project. Every task automatically gets your codebase context.
-
-```bash
-# Create a project (records current directory as the repo)
-cd ~/git/my-api
-fleet project create my-api
-
-# Activate it
-fleet project use my-api
-
-# Now every task includes project context
-fleet run "Add rate limiting"
-```
-
-Fill in the scaffolded context files once — architecture, domain terms, build commands, known failure modes. The more you fill in, the better every run gets.
-
-See [Projects](#projects) below for details.
-
-See [`agentorg/starters/examples/`](agentorg/starters/examples/) for more task spec examples.
+See [Projects](#projects) below for persistent codebase context, and
+[`agentorg/starters/examples/`](agentorg/starters/examples/) for task
+spec examples.
 
 ### Natural language (uses your backend LLM)
 
@@ -365,9 +252,9 @@ Switch projects, and the bottom layers stay — the roles bring their general ex
 A role defines what an agent does — mission, required inputs, exit criteria, skills.
 
 ```bash
-fleet hire content-editor                 # create
-fleet adopt persona architect             # copy starter for customization
-fleet inspect architect                   # view details + knowledge
+fleet role create content-editor          # create
+fleet role adopt architect                # copy starter for customization
+fleet architect                           # view details + knowledge
 ```
 
 19 starter roles across software, content, strategy, research, ops, and docs.
@@ -377,7 +264,7 @@ fleet inspect architect                   # view details + knowledge
 A dependency graph of roles with quality gates. Roles with the same dependencies run in parallel.
 
 ```bash
-fleet team content-pipeline
+fleet team create content-pipeline
 ```
 
 ```yaml
@@ -402,8 +289,8 @@ gates:
 Reusable procedural knowledge — how to do code review, risk assessment, research, etc.
 
 ```bash
-fleet skill                              # list
-fleet skill add architect risk-assessment
+fleet skill                                       # list
+fleet skill add-to-role architect risk-assessment
 fleet skill create api-design
 ```
 
@@ -444,16 +331,15 @@ fleet config set reflection off            # no automatic reflection
 Fleet defines the org. The backend runs it. `fleet run` syncs agents and then **hands off to the backend** — fleet doesn't stay in the middle.
 
 ```bash
-fleet backend                              # show active
-fleet backend use copilot                  # switch
-fleet backends                             # list all + install status
+fleet config                               # show active backend + install status
+fleet config set backend copilot           # switch
 ```
 
 | Backend | Agents written to | How `fleet run` executes |
 |---------|------------------|--------------------------|
-| **Claude Code** | `~/.claude/agents/fleet-*.md` | `claude --agent fleet-{team}-lead "task"` |
-| **Cursor** | `~/.cursor/agents/fleet-*.md` | `cursor --chat` with team prompt |
-| **Copilot** | `~/.squad/` | `squad run` or `copilot -p` |
+| **Claude Code** | `~/.claude/agents/fleet-*.md` + team lead in main session | launches `claude` with the lead template as the orchestration prompt |
+| **Cursor** | `~/.cursor/agents/fleet-*.md` with subagent delegation | launches `cursor` with a prompt that delegates to `/fleet-{org}-{role}` subagents |
+| **Copilot** | `~/.squad/` with `/fleet` | launches `copilot` / `squad` with a prompt that uses the native `/fleet` command for parallel dispatch |
 
 For Claude Code, `fleet run` launches Claude Code interactively with the team lead agent. The lead spawns subagents (one per role), manages handoffs, runs stages in parallel, and produces the final result. You see everything live in your terminal.
 
@@ -487,62 +373,81 @@ fleet config set reflection review         # auto, review, or off
 ```
 Setup:
   fleet init                                 First-time setup
-  fleet config                               View settings
-  fleet config set <key> <value>             Change a setting
+  fleet config                               View all settings + active context
+  fleet config set <key> <value>             Set team, backend, project, reflection,
+                                             org, condense_after, scratch_dir, org_home
+  fleet config clear project                 Clear active project
 
-Context:
-  fleet config                               Show all settings and active context
-  fleet config set <key> <value>             Set team, backend, project, reflection, org, condense_after
-  fleet config clear <key>                   Clear project or org
-
-Projects:
-  fleet project create <id> [--path <dir>]   Create a project
-  fleet project task <name>                  Scaffold a task spec
-  fleet project add-repo <path>              Add a repo to active project
-  fleet project list                         List all projects
-
-Status:
+Daily:
   fleet                                      Show org status + active context
-  fleet org roles                            List roles
-  fleet org teams                            List teams
-  fleet org history                          View recent runs
-  fleet inspect <role>                       Role details + knowledge
+  fleet <name>                               Smart dispatcher — shows details for a
+                                             role / team / project / org / skill
+  fleet ask "<question>"                     Natural language routing
   fleet learnings                            What your org has learned
-  fleet backends                             List all backends + install status
+  fleet sync                                 Sync to active backend (auto-run by run)
 
 Run:
-  fleet run <task>                           Execute via active backend
+  fleet run <task>                           Execute via active team + backend
   fleet run --team <id> <task>               Through a specific team
-  fleet run --solo <task>                    Single-role
-  fleet run path/to/task.md                  From file
+  fleet run --role <id> <task>               Single-role execution
+  fleet run --solo <task>                    Solo mode (active team's lead only)
+  fleet run --new <name>                     Scaffold a task spec in the active
+                                             project, open in $EDITOR, then run
+  fleet run --new <name> --no-run            Scaffold only
+  fleet run path/to/task.md                  Task from a file
   fleet run --prompt <task>                  Output prompt without executing
-  fleet summon <role> <task>                 Ask one role
 
-Build:
-  fleet hire <id>                            Create role
-  fleet team <id>                            Create team
-  fleet adopt <persona|team|skill> <id>      Copy starter to customize
-  fleet contribute <persona|team|skill> <id> Copy to repo to share
+Role (persona):
+  fleet role                                 (same as fleet role list)
+  fleet role list                            List roles
+  fleet role create <id>                     Create a role
+  fleet role edit <id>                       Edit a role in $EDITOR
+  fleet role remove <id>                     Remove a role from your org
+  fleet role adopt <id>                      Copy a starter role to your org
+  fleet role contribute <id>                 Copy a role to the repo for sharing
 
-Skills:
-  fleet skill                                List org skills
-  fleet skill add <role> <skill>             Assign to role
-  fleet skill remove <role> <skill>          Remove from role
-  fleet skill create <id>                    Create org skill
+Team:
+  fleet team                                 List teams
+  fleet team create <id>                     Create a team
+  fleet team edit <id>                       Edit a team in $EDITOR
+  fleet team remove <id>                     Remove from your org
+  fleet team adopt <id>                      Copy a starter team to your org
+  fleet team contribute <id>                 Copy a team to the repo
 
-Sync:
-  fleet sync                                 Sync to active backend
-  fleet sync <team>                          Sync specific team
+Skill:
+  fleet skill                                List skills
+  fleet skill create <id>                    Create a skill
+  fleet skill edit <id>                      Edit in $EDITOR
+  fleet skill remove <id>                    Remove from your org
+  fleet skill add-to-role <role> <skill>     Attach a skill to a role
+  fleet skill remove-from-role <role> <skill>  Detach a skill from a role
+  fleet skill adopt <id>                     Copy a starter skill to your org
+  fleet skill contribute <id>                Copy a skill to the repo
+
+Project:
+  fleet project                              Show active project
+  fleet project list                         List all projects
+  fleet project create <id> [--path <dir>]   Create a project
+  fleet project edit <id>                    Edit project.yaml in $EDITOR
+  fleet project use <id>                     Activate a project
+  fleet project clear                        Deactivate the current project
+  fleet project remove <id>                  Delete a project directory
+  fleet project add-repo <path>              Add a repo to active project
+
+Org:
+  fleet org                                  Overview — roles, teams, recent runs
+  fleet org list                             List named orgs
+  fleet org create <name>                    Create and switch to a new org
+  fleet org edit <name>                      Edit that org's settings.yaml
+  fleet org use <name>                       Switch to a named org
+  fleet org remove <name>                    Delete an org (cannot remove active)
+  fleet org history                          Recent runs
 
 Reflect:
   fleet reflect                              Reflect and apply learnings
   fleet reflect --write-back                 Force write-back regardless of mode
   fleet reflect --prompt                     Output reflection prompt only
 
-Advanced:
-  fleet org use <name>                       Switch to a named org
-  fleet org default                          Switch back to default org
-  fleet org list                             List all orgs
 ```
 
 ---
