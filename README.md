@@ -1,6 +1,8 @@
 # AgentOrg
 
-Build AI organizations that do your work — and get smarter every time they do it. Multiple orgs, multiple projects, multiple teams.
+**Work like a CEO.**
+
+Delegate. Don't do.
 
 <p align="center">
   <img src="images/agentorg-overview.svg" alt="AgentOrg — teams, projects, intelligence loop, backends" width="850"/>
@@ -10,28 +12,37 @@ Build AI organizations that do your work — and get smarter every time they do 
 fleet run "Add rate limiting to the API"
 ```
 
-A PM scopes it. An architect designs it. A developer builds it. A tester and reviewer check it — in parallel. Each role hands off structured artifacts to the next. Quality gates block bad work. And the whole org learns from every run.
+Your PM scopes it. Your architect designs it. Your developer builds it. Your tester and reviewer check it — in parallel. Each role hands off structured artifacts to the next. Quality gates block bad work. And your whole org gets smarter with every run.
 
 ## Why
 
-You wouldn't ship code that only one person looked at. Why accept that from AI?
+**A CEO doesn't ship features. A CEO runs an organization that ships features.**
 
-One agent gives you one shot. AgentOrg gives you an organization — roles that plan, build, test, and review each other's work. The reviewer catches what the developer missed. The tester finds edge cases the architect didn't anticipate. Quality gates block bad work from moving forward.
+Today's AI assistants put you in every seat at once — PM, architect, developer, tester, reviewer. That's not leverage; it's a to-do list with better autocomplete. You're still doing every role's job, just faster.
 
-**Team or role — match the mode to the task.** Not every task needs a whole team. For a big feature, run the full product-delivery pipeline. For a quick refactor question, run just the architect. For creative writing, switch to the content-production team. Same command, different mode:
+AgentOrg gives you what a CEO has:
+
+- **An organization.** Roles with missions. Teams with process. Quality gates that block bad work.
+- **Delegation, not dictation.** You set direction. Your org executes. You review, decide, move on.
+- **Pick the right team for the job.** Product delivery for features. Strategy analysis for decisions. Content production for writing. Incident response for ops. Six starter teams; build your own.
+- **Or call in a single specialist.** Don't need the whole team? Ask just the architect, or just the critic. Same CEO seat, narrower cut.
+- **Institutional memory.** Your architect learns your codebase. Your reviewer learns your common mistakes. Learnings condense — signal stays, noise goes. Run 20 is better than run 1.
+- **Separate orgs for separate contexts.** Work org, personal org, experimental org. Roles and knowledge don't leak between them.
+
+Define it once. Run it everywhere — Claude Code, Cursor, or Copilot.
 
 ```bash
-fleet run "Add rate limiting"                    # uses your default team (or role)
-fleet run --team content-production "write blog" # one-off team override
-fleet run --role architect "should we use X?"    # one-off role override
+fleet run "Add rate limiting"                    # default team (or role)
+fleet run --team content-production "write blog" # pick a team for this one
+fleet run --role architect "should we use X?"    # call in one specialist
+fleet run --project my-api "Add auth"            # in a codebase context
+fleet run --new "rate limiting"                  # draft a spec first, then run
 
-fleet config set team content-production         # switch default to a team
-fleet config set role architect                  # switch default to a single role
+fleet config set team strategy-analysis          # switch default team
+fleet config set role architect                  # switch to role mode
 ```
 
-And your org remembers. Every run teaches it something. Your architect learns your codebase. Your reviewer learns your common mistakes. Learnings condense over time — signal stays, noise goes. Run 20 is better than run 1, automatically.
-
-Define your org once. Use it everywhere — Claude Code, Cursor, or Copilot.
+You're the CEO. One command sets direction. Your org does the rest.
 
 ## Honest pitch: do you actually need this?
 
