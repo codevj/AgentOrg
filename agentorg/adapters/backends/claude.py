@@ -193,6 +193,7 @@ class ClaudeBackend:
             "stages": team.execution_stages(),
             "team_learnings": team_text,
             "org_learnings": org_text,
+            "org_name_with_dash": f"{self._org_name}-" if self._org_name else "",
         })
 
         (self._agent_dir / self._lead_filename(team.id)).write_text(content)
