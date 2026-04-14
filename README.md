@@ -33,7 +33,7 @@ fleet config set role architect                  # switch to role mode
 
 Six starter teams (software, content, strategy, research, ops, docs). 19 starter roles. Build your own with `fleet role create` / `fleet team create`.
 
-## Honest pitch: do you actually need this?
+## Honestly: do you need this?
 
 At the end of the day, AgentOrg launches Claude Code (or Cursor, or Copilot). Everything it does — roles, teams, handoffs, learnings — you *could* piece together by writing agent files, CLAUDE.md entries, and prompt instructions by hand. So the real question is: what does fleet give you that rolling your own doesn't?
 
@@ -54,7 +54,19 @@ At the end of the day, AgentOrg launches Claude Code (or Cursor, or Copilot). Ev
 - Does run 20 actually outperform run 1? The intelligence loop compounds learnings, but we don't have measured data.
 - Does the multi-pass team output beat a single well-prompted agent? Multiple roles give multiple perspectives, but they also cost more.
 
-If the honest pitch matches how you want to work, read on. If not, a good `CLAUDE.md` and a few subagents may be all you need.
+If the honest pitch matches how you want to work, read on. If not, a good `CLAUDE.md` and a few subagents may be all you need *today*.
+
+## Where this is going
+
+An org that **works**, not a CLI you run. The features below are the direction — designed, not yet built.
+
+- **`fleet up`** — a background runner that picks up tasks from a queue, executes them in sandboxed worktrees, and surfaces anything it needs you for. The terminal stops being the interaction surface; an inbox does.
+- **`fleet inbox`** — when a run hits a decision it can't make (risky command, ambiguous spec, architectural choice), it pauses and asks you a structured question with context and options. You answer; it resumes.
+- **`fleet persona`** — bootstrap a role from a real person. Point it at a GitHub user, a team, or a Slack archive; it generates a persona that approximates their taste and judgment. Your architect designs like *your* architect.
+- **Auto team composition** — describe the task; fleet proposes the right team (roles + gates) for it, remembers for next time.
+- **Cross-project pattern transfer** — learnings mined across your projects. *"Prefer Postgres in Go services — seeded into new ones."*
+
+The north star: your org that runs in the background for you, asks you the right questions, learns like your team, and scales from one person to one team.
 
 ## Install
 
