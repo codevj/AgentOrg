@@ -374,7 +374,7 @@ def config_cmd(ctx: click.Context) -> None:
         active_backend = get_active_backend(config)
         proj_svc = ctx.obj["project_service"]
         active_project = proj_svc.get_active()
-        active_org_name = get_active_org() or "default"
+        active_org_name = get_active_org()
         mode = get_reflection_mode(config)
         condense = get_condense_after(config)
 
@@ -385,7 +385,7 @@ def config_cmd(ctx: click.Context) -> None:
         click.echo(f"  backend:           {o.bold(active_backend)}")
         project_str = o.bold(active_project.id) if active_project else o.dim("(none)")
         click.echo(f"  project:           {project_str}")
-        org_str = o.dim(active_org_name) if active_org_name == "default" else o.bold(active_org_name)
+        org_str = o.bold(active_org_name) if active_org_name else o.dim("(default — unnamed)")
         click.echo(f"  org:               {org_str}")
         click.echo(f"  reflection:        {mode.value}")
         click.echo(f"  condense_after:    {condense}")

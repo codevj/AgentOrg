@@ -202,15 +202,10 @@ def get_reflection_mode(config: Config) -> ReflectionMode:
 
 def set_reflection_mode(config: Config, mode: ReflectionMode) -> None:
     """Write reflection mode to settings file, preserving other settings."""
-    settings_file = config.org_home / _SETTINGS_FILENAME
-    config.org_home.mkdir(parents=True, exist_ok=True)
-    data: dict = {}
-    if settings_file.is_file():
-        data = yaml.safe_load(settings_file.read_text()) or {}
+    data = _read_settings(config)
     data["reflection"] = mode.value
-    # Remove legacy key if present
-    data.pop("auto_reflect", None)
-    settings_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+    data.pop("auto_reflect", None)  # remove legacy key
+    _write_settings(config, data)
 
 
 # ── Org switching ──
@@ -255,29 +250,65 @@ def list_orgs() -> list[str]:
     return sorted(d.name for d in orgs_dir.iterdir() if d.is_dir())
 
 
+# ── Settings helpers ──
+
+
+def _read_settings(config: Config) -> dict:
+    """Read settings.yaml, migrating legacy dot-files if present."""
+    settings_file = config.org_home / _SETTINGS_FILENAME
+    data: dict = {}
+    if settings_file.is_file():
+        data = yaml.safe_load(settings_file.read_text()) or {}
+
+    # Migrate legacy .active-backend dot-file
+    legacy_backend = config.org_home / ".active-backend"
+    if legacy_backend.is_file() and "active_backend" not in data:
+        value = legacy_backend.read_text().strip()
+        if value:
+            data["active_backend"] = value
+            _write_settings(config, data)
+        legacy_backend.unlink()
+
+    # Migrate legacy .active-project dot-file
+    legacy_project = config.org_home / ".active-project"
+    if legacy_project.is_file() and "active_project" not in data:
+        value = legacy_project.read_text().strip()
+        if value:
+            data["active_project"] = value
+            _write_settings(config, data)
+        legacy_project.unlink()
+
+    return data
+
+
+def _write_settings(config: Config, data: dict) -> None:
+    """Write settings.yaml, preserving ordering."""
+    config.org_home.mkdir(parents=True, exist_ok=True)
+    settings_file = config.org_home / _SETTINGS_FILENAME
+    settings_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+
+
 # ── Project switching ──
 
 
 def get_active_project(config: Config) -> str | None:
     """Return active project id, or None if no project is active."""
-    pointer = config.org_home / ".active-project"
-    if pointer.is_file():
-        value = pointer.read_text().strip()
-        return value if value else None
-    return None
+    data = _read_settings(config)
+    value = data.get("active_project")
+    return value if value else None
 
 
 def set_active_project(config: Config, project_id: str) -> None:
-    """Set the active project pointer."""
-    config.org_home.mkdir(parents=True, exist_ok=True)
-    (config.org_home / ".active-project").write_text(project_id + "\n")
+    data = _read_settings(config)
+    data["active_project"] = project_id
+    _write_settings(config, data)
 
 
 def clear_active_project(config: Config) -> None:
-    """Clear the active project pointer."""
-    pointer = config.org_home / ".active-project"
-    if pointer.is_file():
-        pointer.unlink()
+    data = _read_settings(config)
+    if "active_project" in data:
+        data.pop("active_project")
+        _write_settings(config, data)
 
 
 # ── Backend switching ──
@@ -286,41 +317,33 @@ def clear_active_project(config: Config) -> None:
 def get_active_backend(config: Config) -> str:
     """Return the active backend name.
 
-    Resolution: .active-backend file → env var → config default.
+    Resolution: active_backend in settings.yaml → env var → config default.
     """
-    pointer = config.org_home / ".active-backend"
-    if pointer.is_file():
-        value = pointer.read_text().strip()
-        if value:
-            return value
+    data = _read_settings(config)
+    value = data.get("active_backend")
+    if value:
+        return value
     return config.default_backend
+
+
+def set_active_backend(config: Config, name: str) -> None:
+    """Persist *name* as the active backend in settings.yaml."""
+    data = _read_settings(config)
+    data["active_backend"] = name
+    _write_settings(config, data)
 
 
 def get_condense_after(config: Config) -> int:
     """Read condense_after from settings file. Defaults to 5."""
-    settings_file = config.org_home / _SETTINGS_FILENAME
-    if settings_file.is_file():
-        data = yaml.safe_load(settings_file.read_text()) or {}
-        val = data.get("condense_after", _DEFAULT_SETTINGS["condense_after"])
-        try:
-            return int(val)
-        except (TypeError, ValueError):
-            return _DEFAULT_SETTINGS["condense_after"]
-    return _DEFAULT_SETTINGS["condense_after"]
+    data = _read_settings(config)
+    val = data.get("condense_after", _DEFAULT_SETTINGS["condense_after"])
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return _DEFAULT_SETTINGS["condense_after"]
 
 
 def set_condense_after(config: Config, value: int) -> None:
-    """Write condense_after to settings file, preserving other settings."""
-    settings_file = config.org_home / _SETTINGS_FILENAME
-    config.org_home.mkdir(parents=True, exist_ok=True)
-    data: dict = {}
-    if settings_file.is_file():
-        data = yaml.safe_load(settings_file.read_text()) or {}
+    data = _read_settings(config)
     data["condense_after"] = value
-    settings_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
-
-
-def set_active_backend(config: Config, name: str) -> None:
-    """Persist *name* as the active backend."""
-    config.org_home.mkdir(parents=True, exist_ok=True)
-    (config.org_home / ".active-backend").write_text(name + "\n")
+    _write_settings(config, data)
