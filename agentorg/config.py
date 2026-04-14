@@ -143,6 +143,10 @@ class Config:
         return self.org_home / "skills"
 
     @property
+    def user_templates_dir(self) -> Path:
+        return self.org_home / "templates"
+
+    @property
     def knowledge_dir(self) -> Path:
         return self.org_home / "knowledge"
 

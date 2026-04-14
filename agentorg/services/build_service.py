@@ -196,6 +196,57 @@ class BuildService:
         self._knowledge.init_persona(persona_id)
         return adopted
 
+    def adopt_persona_if_missing(self, persona_id: str) -> bool:
+        """Adopt a persona if it's not already in the user's org.
+
+        Returns True if a copy was made, False if the persona was already a
+        user item or could not be resolved.
+        """
+        if self._personas.source(persona_id) == ItemSource.USER:
+            return False
+        persona = self._personas.get(persona_id)
+        if persona is None:
+            return False
+        adopted = Persona(
+            id=persona.id,
+            raw_content=persona.raw_content,
+            mission=persona.mission,
+            required_inputs=persona.required_inputs,
+            exit_criteria=persona.exit_criteria,
+            non_goals=persona.non_goals,
+            skill_ids=persona.skill_ids,
+            source=ItemSource.USER,
+        )
+        self._personas.save_to_user(adopted)
+        self._knowledge.init_persona(persona_id)
+        return True
+
+    def adopt_team_if_missing(self, team_id: str) -> bool:
+        """Adopt a team if it's not already in the user's org.
+
+        Returns True if a copy was made, False if the team was already a user
+        item or could not be resolved.
+        """
+        if self._teams.source(team_id) == ItemSource.USER:
+            return False
+        team = self._teams.get(team_id)
+        if team is None:
+            return False
+        adopted = Team(
+            id=team.id,
+            mode_default=team.mode_default,
+            persona_ids=team.persona_ids,
+            role_specs=team.role_specs,
+            governance_profile=team.governance_profile,
+            execution_profile=team.execution_profile,
+            gates=team.gates,
+            budget=team.budget,
+            source=ItemSource.USER,
+        )
+        self._teams.save_to_user(adopted)
+        self._knowledge.init_team(team_id)
+        return True
+
     def adopt_team(self, team_id: str) -> Team:
         if self._teams.source(team_id) == ItemSource.USER:
             raise ValueError(f"Already in your org: {team_id}")

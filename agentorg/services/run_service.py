@@ -8,7 +8,7 @@ from pathlib import Path
 from agentorg.config import ReflectionMode
 from agentorg.domain.budget import BudgetState
 from agentorg.domain.knowledge import has_content, strip_placeholders
-from agentorg.domain.models import BudgetActivity, Run, RunMode, RunStatus
+from agentorg.domain.models import BudgetActivity, ItemSource, Persona, Run, RunMode, RunStatus, Team
 from agentorg.ports.backend import Backend
 from agentorg.ports.knowledge_store import KnowledgeStore
 from agentorg.ports.repository import PersonaRepository, PolicyRepository, SkillRepository, TeamRepository
@@ -117,6 +117,61 @@ class RunService:
         self._runs = run_store
         self._renderer = renderer
         self._reflect = reflect_service
+        # Populated after ``execute()``: (adopted_personas, adopted_team_id_or_None)
+        self.last_adopted_personas: list[str] = []
+        self.last_adopted_team: str | None = None
+
+    def _adopt_on_use(self, team_id: str) -> None:
+        """Copy starter team and its personas to the user's org if absent.
+
+        Populates ``last_adopted_personas`` and ``last_adopted_team`` so the
+        CLI can report what was copied.
+        """
+        self.last_adopted_personas = []
+        self.last_adopted_team = None
+
+        # Adopt the team itself if it's currently a repo/starter item
+        if self._teams.source(team_id) != ItemSource.USER:
+            team = self._teams.get(team_id)
+            if team is not None:
+                adopted_team = Team(
+                    id=team.id,
+                    mode_default=team.mode_default,
+                    persona_ids=team.persona_ids,
+                    role_specs=team.role_specs,
+                    governance_profile=team.governance_profile,
+                    execution_profile=team.execution_profile,
+                    gates=team.gates,
+                    budget=team.budget,
+                    source=ItemSource.USER,
+                )
+                self._teams.save_to_user(adopted_team)
+                self._knowledge.init_team(team_id)
+                self.last_adopted_team = team_id
+
+        # Adopt each persona referenced by the team
+        team = self._teams.get(team_id)
+        if team is None:
+            return
+        for pid in team.persona_ids:
+            if self._personas.source(pid) == ItemSource.USER:
+                continue
+            persona = self._personas.get(pid)
+            if persona is None:
+                continue
+            adopted_persona = Persona(
+                id=persona.id,
+                raw_content=persona.raw_content,
+                mission=persona.mission,
+                required_inputs=persona.required_inputs,
+                exit_criteria=persona.exit_criteria,
+                non_goals=persona.non_goals,
+                skill_ids=persona.skill_ids,
+                source=ItemSource.USER,
+            )
+            self._personas.save_to_user(adopted_persona)
+            self._knowledge.init_persona(pid)
+            self.last_adopted_personas.append(pid)
 
     def build_team_prompt(self, team_id: str, task: str, *, project_root: Path | None = None) -> str:
         """Build a team execution prompt (for clipboard/non-exec mode)."""
@@ -168,6 +223,13 @@ class RunService:
 
         if not solo and team_id is None:
             raise ValueError("No team specified. Set a default with: fleet config set default_team <id>")
+
+        # Auto-adopt starter team + personas to user's org on first use.
+        # Subsequent runs become no-ops because the items are already USER.
+        self.last_adopted_personas = []
+        self.last_adopted_team = None
+        if not solo and team_id is not None:
+            self._adopt_on_use(team_id)
 
         # Init budget
         team = self._teams.get(team_id) if team_id else None

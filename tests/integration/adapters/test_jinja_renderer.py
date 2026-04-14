@@ -58,6 +58,33 @@ def test_render_team_prompt():
     assert "rate limiting" in result
 
 
+def test_user_dir_overrides_package_template(tmp_path):
+    """User templates take precedence over package templates of the same name."""
+    user_dir = tmp_path / "templates"
+    user_dir.mkdir()
+    (user_dir / "solo_prompt.md.j2").write_text("USER OVERRIDE: {{ task }}\n")
+
+    renderer = JinjaRenderer(user_dir=user_dir)
+    result = renderer.render("solo_prompt.md.j2", {"task": "Fix X.", **_EMPTY_PROJECT_VARS})
+    assert result.startswith("USER OVERRIDE: Fix X.")
+
+
+def test_user_dir_falls_back_to_package_when_missing(tmp_path):
+    """Non-existent user_dir doesn't break package lookup."""
+    renderer = JinjaRenderer(user_dir=tmp_path / "does-not-exist")
+    result = renderer.render("solo_prompt.md.j2", {"task": "X", **_EMPTY_PROJECT_VARS})
+    assert "solo workflow" in result
+
+
+def test_user_dir_without_matching_template_falls_back(tmp_path):
+    """If user_dir exists but lacks the template, package template is used."""
+    user_dir = tmp_path / "templates"
+    user_dir.mkdir()
+    renderer = JinjaRenderer(user_dir=user_dir)
+    result = renderer.render("solo_prompt.md.j2", {"task": "X", **_EMPTY_PROJECT_VARS})
+    assert "solo workflow" in result
+
+
 def test_render_claude_agent():
     renderer = JinjaRenderer()
     result = renderer.render("claude_agent.md.j2", {

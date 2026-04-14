@@ -58,6 +58,52 @@ def test_adopt_already_user_raises(service: BuildService):
         service.adopt_persona("architect")
 
 
+def test_adopt_persona_if_missing_returns_false_when_user(service: BuildService):
+    service._personas.source.return_value = ItemSource.USER
+    assert service.adopt_persona_if_missing("architect") is False
+    service._personas.save_to_user.assert_not_called()
+
+
+def test_adopt_persona_if_missing_copies_when_repo(service: BuildService):
+    service._personas.source.return_value = ItemSource.REPO
+    service._personas.get.return_value = Persona(
+        id="architect", raw_content="# test", mission="Design", source=ItemSource.REPO
+    )
+    assert service.adopt_persona_if_missing("architect") is True
+    service._personas.save_to_user.assert_called_once()
+    service._knowledge.init_persona.assert_called_once_with("architect")
+
+
+def test_adopt_persona_if_missing_returns_false_when_not_found(service: BuildService):
+    service._personas.source.return_value = ItemSource.NONE
+    service._personas.get.return_value = None
+    assert service.adopt_persona_if_missing("ghost") is False
+    service._personas.save_to_user.assert_not_called()
+
+
+def test_adopt_team_if_missing_returns_false_when_user(service: BuildService):
+    service._teams.source.return_value = ItemSource.USER
+    assert service.adopt_team_if_missing("product-delivery") is False
+    service._teams.save_to_user.assert_not_called()
+
+
+def test_adopt_team_if_missing_copies_when_repo(service: BuildService):
+    service._teams.source.return_value = ItemSource.REPO
+    service._teams.get.return_value = Team(
+        id="product-delivery",
+        mode_default=RunMode.TEAM,
+        persona_ids=["architect"],
+        governance_profile="quality_first",
+        execution_profile="local_default",
+        gates=Gates(),
+        budget=Budget(),
+        source=ItemSource.REPO,
+    )
+    assert service.adopt_team_if_missing("product-delivery") is True
+    service._teams.save_to_user.assert_called_once()
+    service._knowledge.init_team.assert_called_once_with("product-delivery")
+
+
 def test_contribute_persona(service: BuildService):
     service._personas.source.return_value = ItemSource.USER
     service._personas.get.return_value = Persona(

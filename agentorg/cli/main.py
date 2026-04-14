@@ -40,7 +40,7 @@ def _build_context() -> dict:
     policy_repo = FilePolicyRepository(config)
     knowledge_store = FileKnowledgeStore(config)
     run_store = FileRunStore(config)
-    renderer = JinjaRenderer()
+    renderer = JinjaRenderer(user_dir=config.user_templates_dir)
     executor = SubprocessExecutor()
 
     # Backends
@@ -616,6 +616,23 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
         except RuntimeError as e:
             click.echo(o.error(f"Execution failed: {e}"), err=True)
             raise SystemExit(1)
+        # Report any auto-adoption that happened on first use.
+        adopted_personas = getattr(run_svc, "last_adopted_personas", []) or []
+        adopted_team = getattr(run_svc, "last_adopted_team", None)
+        if adopted_personas:
+            click.echo(
+                o.success(
+                    f"Copied to ~/.agent-org/personas/ for editing: {', '.join(adopted_personas)}"
+                ),
+                err=True,
+            )
+        if adopted_team:
+            click.echo(
+                o.success(
+                    f"Copied to ~/.agent-org/teams/ for editing: {adopted_team}.yaml"
+                ),
+                err=True,
+            )
         if result.output:
             click.echo(result.output)
         click.echo(o.success("Run complete.") + f" {o.dim(result.budget_summary)}", err=True)
