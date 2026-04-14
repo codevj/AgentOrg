@@ -196,6 +196,49 @@ def _normalize_org_name(name: str) -> str:
     return name.strip().lower().replace(" ", "-")
 
 
+def _parse_budget_from_spec(task: str) -> dict | None:
+    """Extract budget overrides from a '## Budget' section in a task spec.
+
+    Expected format:
+        ## Budget
+        max_calls: 20
+        reflection: true
+        interactions: 5
+
+    Returns None if no Budget section found, else a dict with any of the
+    three keys that were present.
+    """
+    lines = task.splitlines()
+    in_budget = False
+    result: dict = {}
+    for line in lines:
+        stripped = line.strip()
+        if stripped.lower().startswith("## budget"):
+            in_budget = True
+            continue
+        if in_budget:
+            # Stop at the next heading
+            if stripped.startswith("## ") or stripped.startswith("# "):
+                break
+            if ":" in stripped:
+                key, _, value = stripped.partition(":")
+                key = key.strip().lower().replace("-", "_")
+                value = value.strip()
+                if key == "max_calls":
+                    try:
+                        result["max_calls"] = int(value)
+                    except ValueError:
+                        pass
+                elif key == "reflection":
+                    result["reflection"] = value.lower() in ("true", "yes", "1", "on")
+                elif key == "interactions":
+                    try:
+                        result["interactions"] = int(value)
+                    except ValueError:
+                        pass
+    return result or None
+
+
 def _env_home_set() -> bool:
     import os as _os
     return bool(_os.environ.get("AGENT_ORG_HOME"))
@@ -691,8 +734,12 @@ def status(ctx: click.Context) -> None:
 @click.option("--team", "-t", default=None, help="Team to run through")
 @click.option("--solo", is_flag=True, help="Single-role execution")
 @click.option("--prompt", "prompt_only", is_flag=True, help="Output the prompt without executing")
+@click.option("--budget", "budget_calls", type=int, default=None,
+              help="Override max_calls budget for this run")
+@click.option("--no-reflect", is_flag=True, help="Skip reflection for this run")
 @click.pass_context
-def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool, prompt_only: bool) -> None:
+def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
+        prompt_only: bool, budget_calls: int | None, no_reflect: bool) -> None:
     """Run a task through your org."""
     run_svc = ctx.obj["run_service"]
     task_str = " ".join(task)
@@ -701,6 +748,21 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
     task_path = Path(task_str)
     if task_path.is_file():
         task_str = task_path.read_text()
+
+    # Parse budget override from task spec if present
+    spec_budget = _parse_budget_from_spec(task_str)
+
+    # Build the budget override: CLI flag > spec > team default
+    budget_override = None
+    if budget_calls is not None or spec_budget or no_reflect:
+        from agentorg.domain.models import Budget
+        # Start from spec values, then apply CLI flags
+        base = spec_budget or {}
+        budget_override = Budget(
+            max_calls=budget_calls if budget_calls is not None else base.get("max_calls", 15),
+            reflection=(not no_reflect) and base.get("reflection", True),
+            interactions=base.get("interactions", 3),
+        )
 
     # Resolve active project
     proj_svc = ctx.obj["project_service"]
@@ -779,6 +841,7 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
                 project_repo_paths=project_repo_paths,
                 scratch_dir=scratch,
                 condense_after=condense,
+                budget_override=budget_override,
             )
         except RuntimeError as e:
             click.echo(o.error(f"Execution failed: {e}"), err=True)

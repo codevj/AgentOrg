@@ -8,7 +8,7 @@ from pathlib import Path
 from agentorg.config import ReflectionMode
 from agentorg.domain.budget import BudgetState
 from agentorg.domain.knowledge import has_content, strip_placeholders
-from agentorg.domain.models import BudgetActivity, ItemSource, Persona, Run, RunMode, RunStatus, Team
+from agentorg.domain.models import Budget, BudgetActivity, ItemSource, Persona, Run, RunMode, RunStatus, Team
 from agentorg.ports.backend import Backend
 from agentorg.ports.knowledge_store import KnowledgeStore
 from agentorg.ports.repository import PersonaRepository, PolicyRepository, SkillRepository, TeamRepository
@@ -218,6 +218,7 @@ class RunService:
         project_repo_paths: list[Path] | None = None,
         scratch_dir: Path | None = None,
         condense_after: int = 0,
+        budget_override: "Budget | None" = None,
     ) -> Run:
         """Execute a task via a backend. Returns the Run record."""
         run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -233,9 +234,10 @@ class RunService:
         if not solo and team_id is not None:
             self._adopt_on_use(team_id)
 
-        # Init budget
+        # Init budget — override (CLI/spec) wins over team default
         team = self._teams.get(team_id) if team_id else None
-        budget = BudgetState.from_budget(team.budget) if team else BudgetState()
+        effective_budget = budget_override or (team.budget if team else None)
+        budget = BudgetState.from_budget(effective_budget) if effective_budget else BudgetState()
 
         if not budget.check(BudgetActivity.EXEC):
             raise RuntimeError(f"Budget exceeded: {budget.summary()}")
