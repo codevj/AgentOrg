@@ -143,20 +143,49 @@ class ClaudeBackend:
         return result.stdout
 
     def execute(self, team_id: str, task: str, run_id: str, cwd: Path | None = None) -> str:
-        """Sync agents and launch the team lead agent interactively via Claude Code.
+        """Sync agents and launch Claude Code's main session with orchestration instructions.
 
-        Hands off control to Claude Code — the user sees live output.
-        Returns empty string since output goes directly to terminal.
-        If cwd is provided, Claude Code runs in that directory (otherwise uses current cwd).
+        The lead template is rendered as the main prompt (not as a subagent) so
+        Claude Code's main session can create an agent team — subagents can't
+        create teams, only the main session can.
+
+        Hands off control to Claude Code interactively. Returns empty string.
         """
         self.sync(team_id)
         if not self._executor.is_installed("claude"):
             raise RuntimeError("'claude' CLI not found")
-        lead = self._lead_filename(team_id).removesuffix(".md")
-        exit_code = self._executor.run_interactive(
-            f'claude --agent {lead} "{self._escape(task)}"',
-            cwd=cwd,
-        )
+
+        # Render the lead template as the orchestration instructions.
+        lead_path = self._agent_dir / self._lead_filename(team_id)
+        if not lead_path.is_file():
+            raise RuntimeError(f"Lead template not found: {lead_path}")
+        lead_content = lead_path.read_text()
+        # Strip the YAML frontmatter — we want the body only as instructions.
+        body = _strip_frontmatter(lead_content)
+
+        # Combine orchestration + task into one prompt.
+        full_prompt = f"{body}\n\n---\n\n## Your Task\n\n{task}\n"
+
+        # Write to a temp file and pipe it in, to avoid shell escaping issues.
+        import tempfile
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False, dir=cwd if cwd else None,
+        ) as f:
+            f.write(full_prompt)
+            prompt_file = f.name
+
+        try:
+            exit_code = self._executor.run_interactive(
+                f'cat "{prompt_file}" | claude',
+                cwd=cwd,
+            )
+        finally:
+            import os
+            try:
+                os.unlink(prompt_file)
+            except OSError:
+                pass
+
         if exit_code != 0:
             raise RuntimeError(f"Claude Code exited with code {exit_code}")
         return ""
@@ -197,3 +226,14 @@ class ClaudeBackend:
         })
 
         (self._agent_dir / self._lead_filename(team.id)).write_text(content)
+
+
+def _strip_frontmatter(content: str) -> str:
+    """Strip YAML frontmatter (between --- markers at the top) from markdown."""
+    lines = content.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return content
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return "\n".join(lines[i + 1:]).lstrip()
+    return content
