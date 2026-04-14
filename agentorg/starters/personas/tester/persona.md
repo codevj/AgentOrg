@@ -11,7 +11,7 @@ Verify behavior, edge cases, and regressions.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: what was tested and environment assumptions
 - `decision`: pass/fail per test area

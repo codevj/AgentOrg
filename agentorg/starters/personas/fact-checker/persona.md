@@ -11,7 +11,7 @@ Verify every factual claim and source in the content.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: count of claims to verify and sources to assess
 - `decision`: verification verdict per claim (verified, disputed, unverifiable)

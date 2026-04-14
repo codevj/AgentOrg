@@ -11,7 +11,7 @@ Ensure docs are accurate, concise, and executable.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: changed docs and target audience
 - `decision`: approve or request edits

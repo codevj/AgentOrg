@@ -11,7 +11,7 @@ Identify correctness, maintainability, and risk findings.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: reviewed scope and assumptions
 - `decision`: approve or request changes

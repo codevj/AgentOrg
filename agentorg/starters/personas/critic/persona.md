@@ -11,7 +11,7 @@ Stress-test strategic recommendations by finding weaknesses, blind spots, and fa
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: strategic recommendations and underlying assumptions
 - `decision`: vulnerability assessment and challenge verdict for each recommendation

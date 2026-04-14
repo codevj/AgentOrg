@@ -12,7 +12,7 @@ Identify the root cause of an incident through systematic investigation.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: triager assessment, available logs, and recent changes reviewed
 - `decision`: root cause determination with evidence

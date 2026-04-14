@@ -12,7 +12,7 @@ Gather comprehensive, verified information on a topic.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: research question restated with scope and depth parameters
 - `decision`: key findings and identified themes

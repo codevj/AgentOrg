@@ -12,7 +12,7 @@ Break down a problem space into structured findings with supporting evidence.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: problem dimensions and data landscape
 - `decision`: key findings and their confidence levels

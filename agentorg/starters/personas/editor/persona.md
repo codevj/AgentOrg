@@ -12,7 +12,7 @@ Ensure content is clear, accurate, and polished.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: draft quality assessment and style guide requirements
 - `decision`: edits applied and style compliance verdict

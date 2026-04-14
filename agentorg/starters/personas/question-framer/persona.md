@@ -12,7 +12,7 @@ Transform a vague research need into precise, answerable research questions.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: research topic, context, and intended use
 - `decision`: 3-5 specific research questions with scope boundaries

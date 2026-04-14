@@ -12,7 +12,7 @@ Design a resolution plan that fixes the root cause and prevents recurrence.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: root cause, contributing factors, and system constraints
 - `decision`: fix plan targeting the root cause

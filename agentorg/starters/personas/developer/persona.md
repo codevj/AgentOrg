@@ -12,7 +12,7 @@ Implement approved design with minimal scoped changes.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: implementation scope and constraints
 - `decision`: what was implemented and why

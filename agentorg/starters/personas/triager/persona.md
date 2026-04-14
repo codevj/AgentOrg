@@ -12,7 +12,7 @@ Assess incident severity, identify affected systems, and establish response prio
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: incident report summary and system context
 - `decision`: severity classification and response priority

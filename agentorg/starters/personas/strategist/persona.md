@@ -12,7 +12,7 @@ Synthesize analysis into actionable strategic options with tradeoffs.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: analytical findings and organizational context
 - `decision`: 2-3 strategic options with pros/cons and a recommended path

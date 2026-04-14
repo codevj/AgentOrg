@@ -11,7 +11,7 @@ Make a clear, justified decision based on strategy and critique, with an action 
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: strategic options, critique findings, and authority scope
 - `decision`: final decision with rationale and selected option

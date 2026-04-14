@@ -12,7 +12,7 @@ Define customer-centric outcomes, scope, and acceptance criteria.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: summarize user need and affected users
 - `decision`: approved scope and exclusions

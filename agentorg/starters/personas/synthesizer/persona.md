@@ -11,7 +11,7 @@ Distill research findings into clear, actionable insights with a coherent narrat
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: research questions and raw findings received
 - `decision`: synthesized findings organized by research question

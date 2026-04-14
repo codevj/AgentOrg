@@ -12,7 +12,7 @@ Produce clear, compelling content from research findings.
 
 ## Output format
 
-Must follow `fleet/core/contracts/handoff-schema.md` with:
+Must follow the handoff contract (included in your agent definition) with:
 
 - `input_digest`: research themes and audience requirements summarized
 - `decision`: chosen content structure and narrative approach
