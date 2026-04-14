@@ -22,15 +22,28 @@ And your org remembers. Every run teaches it something. Your architect learns yo
 
 Define your org once. Use it everywhere — Claude Code, Cursor, or Copilot.
 
-- **Multiple perspectives** — an architect catches what a developer misses
-- **Quality gates** — a reviewer blocks bad code before it ships
-- **Institutional memory** — learnings from past runs make future runs better
-- **Parallel execution** — independent roles run simultaneously, not sequentially
-- **Different work, different teams** — product delivery for features, strategy analysis for decisions, content production for writing. Switch with one command.
-- **Projects remember your codebase** — architecture, build commands, domain terms, failure modes. Fill in once, every task in that project gets the context automatically.
-- **Skills are reusable** — code review, risk assessment, deployment procedures. Assign them to roles or keep them project-specific.
-- **Personal and work, separated** — multiple orgs with their own roles, knowledge, and history. Your side project doesn't mix with your day job.
-- **One command** — `fleet run` handles everything. You watch the team work.
+## Honest pitch: do you actually need this?
+
+At the end of the day, AgentOrg launches Claude Code (or Cursor, or Copilot). Everything it does — roles, teams, handoffs, learnings — you *could* piece together by writing agent files, CLAUDE.md entries, and prompt instructions by hand. So the real question is: what does fleet give you that rolling your own doesn't?
+
+**You don't need fleet if:**
+- You use one AI tool, one codebase, one workflow
+- You're happy maintaining agent `.md` files and CLAUDE.md directly
+- A good prompt and maybe a subagent or two covers your needs
+
+**Fleet is worth it if you want:**
+- **One org definition, many AI tools.** Fleet syncs the same roles/teams to Claude Code, Cursor, and Copilot. If you use more than one, you define it once.
+- **Isolated orgs for different contexts.** Work vs personal vs experimental — each with its own roles, knowledge, and history. No leakage. Claude Code has one `~/.claude/`.
+- **Team compositions as versioned config.** A team YAML with role dependencies is committable, reviewable, shareable. Your team knows what "product-delivery" means because it's in git.
+- **Structured learnings that don't drift.** Three explicit layers (role / project / org). Automatic condensation after N reflections — signal stays, noise goes. Changelog for lineage. Freeform agent memory doesn't give you this.
+- **Project context that travels with every task.** Architecture, glossary, build commands, failure modes — injected automatically on every run in that project. CLAUDE.md covers some of this; project-level knowledge accumulation across runs doesn't exist there.
+- **Predictable commands, not prompts.** `fleet run`, `fleet project use`, `fleet config set team X` — an opinionated CLI that models the work, instead of "ask your AI to do X the right way."
+
+**What's still unproven:**
+- Does run 20 actually outperform run 1? The intelligence loop compounds learnings, but we don't have measured data.
+- Does the multi-pass team output beat a single well-prompted agent? Multiple roles give multiple perspectives, but they also cost more.
+
+If the honest pitch matches how you want to work, read on. If not, a good `CLAUDE.md` and a few subagents may be all you need.
 
 ## Install
 
