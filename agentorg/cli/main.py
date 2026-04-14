@@ -292,13 +292,22 @@ def _build_cli_reference() -> str:
 
 
 _FLEET_HELPER_PROMPT = """\
-Translate this natural language request into a fleet CLI command.
+Translate a natural language request into EITHER a complete fleet CLI command OR a help message.
 
-Rules:
-- Output ONLY the command. One line. No explanation, no reasoning, no markdown.
-- Do NOT output anything before or after the command.
+Output exactly ONE line. No reasoning, no markdown fences.
 
-Common mappings:
+## Decide first: is this a "how do I" / "what is" question, or an action request?
+
+- "how do I create a project" → HELP: fleet project create <project-id>   # then edit ~/.agent-org/.../context files
+- "what does fleet run do" → HELP: fleet run <task>   # runs the active team against the task
+- "how to switch teams" → HELP: fleet config set team <team-id>
+
+For a HELP answer, start with "HELP: " — do NOT actually run anything.
+
+For an ACTION, the command MUST include all required arguments. If the user didn't supply them, fall back to a HELP response instead.
+
+## Action mappings (when the user has given you what's needed):
+
 - "show/view learnings" → fleet learnings
 - "show/view/inspect role X" or "show X learnings" → fleet inspect X
 - "list roles" → fleet org roles
@@ -312,6 +321,11 @@ Common mappings:
 - "list projects" → fleet project list
 - "create task X" → fleet project task "X"
 
+## Rules
+
+- If required arguments are missing, output "HELP: <usage>" — never a bare incomplete command.
+- For actions, output just the command (one line, no "fleet" prefix doubled).
+
 Current context:
 {context}
 
@@ -320,7 +334,7 @@ Full CLI reference:
 
 User request: {query}
 
-Command:"""
+Answer:"""
 
 
 @fleet.command(hidden=True)
@@ -362,24 +376,32 @@ def ask(ctx: click.Context, query: tuple[str, ...]) -> None:
         raise SystemExit(1)
 
     # Clean up — LLM might wrap in backticks, add explanation, or multi-line
-    # Take only the first line that looks like a fleet command
-    command = ""
+    answer = ""
     for line in raw_command.splitlines():
         line = line.strip().strip("`").strip()
         if not line:
             continue
-        if line.startswith("fleet "):
-            line = line[6:]
-        # Skip lines that look like reasoning, not commands
+        # Skip reasoning lines
         if any(line.lower().startswith(w) for w in ("wait", "let me", "actually", "i ", "the ")):
             continue
-        command = line
+        answer = line
         break
 
-    if not command:
+    if not answer:
         click.echo(o.error(f"Could not translate: {query_str}"), err=True)
         raise SystemExit(1)
 
+    # HELP: response — show usage, don't execute
+    if answer.upper().startswith("HELP:"):
+        help_text = answer[5:].strip()
+        click.echo(o.bold("How to do it:"))
+        click.echo(f"  {help_text}")
+        return
+
+    # Action — strip redundant 'fleet ' prefix and show the command
+    command = answer
+    if command.startswith("fleet "):
+        command = command[6:]
     click.echo(f"→ fleet {command}")
 
 
