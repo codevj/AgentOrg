@@ -258,6 +258,15 @@ class RunService:
         output = backend.execute(team_id or "solo", task, run_id, cwd=workdir)
         budget.record(BudgetActivity.EXEC)
 
+        # Collect trace info for the run log
+        roles = list(team.persona_ids) if team else []
+        stages = team.execution_stages() if team else []
+        from agentorg.config import get_active_org
+        try:
+            org_name = get_active_org()
+        except Exception:
+            org_name = ""
+
         run = Run(
             id=run_id,
             mode=mode,
@@ -268,6 +277,12 @@ class RunService:
             output=output,
             backend=backend.info().name,
             budget_summary=budget.summary(),
+            roles=roles,
+            stages=stages,
+            workdir=str(workdir) if workdir else "",
+            org_name=org_name,
+            project_id=project_id,
+            reflection_mode=reflection_mode.value,
         )
         self._runs.save(run)
         self._runs.save_budget(run_id, budget)

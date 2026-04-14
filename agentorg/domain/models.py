@@ -224,6 +224,13 @@ class Run:
     output: str = ""
     backend: str = ""
     budget_summary: str = ""
+    # Debug/trace info
+    roles: list[str] = field(default_factory=list)
+    stages: list[list[str]] = field(default_factory=list)
+    workdir: str = ""
+    org_name: str = ""
+    project_id: str | None = None
+    reflection_mode: str = ""
 
 
 @dataclass(frozen=True)

@@ -716,14 +716,51 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
 
         mode = get_reflection_mode(ctx.obj["config"])
         team_id = team or ctx.obj["config"].default_team
-        click.echo(o.dim(f"Running via {backend_name} (team: {team_id})..."), err=True)
-        click.echo()
         condense = get_condense_after(ctx.obj["config"])
 
         # Resolve workdir: project's repos if a project is active, else scratch_dir
         from agentorg.config import get_scratch_dir
         project_repo_paths = active_project.repo_paths if active_project and active_project.repo_paths else None
         scratch = get_scratch_dir(ctx.obj["config"])
+        workdir = project_repo_paths[0] if project_repo_paths else scratch
+
+        # Pre-flight: adopt starters so the user sees everything we'll use.
+        # Do this BEFORE handing off to the backend so the messages appear up front.
+        if not solo and team_id:
+            build = ctx.obj["build_service"]
+            adopted_team = build.adopt_team_if_missing(team_id)
+            team_obj = build._teams.get(team_id)
+            adopted_personas = []
+            if team_obj:
+                for pid in team_obj.persona_ids:
+                    if build.adopt_persona_if_missing(pid):
+                        adopted_personas.append(pid)
+            if adopted_team:
+                click.echo(
+                    o.success(f"Copied team '{team_id}' to your org (teams/{team_id}.yaml) for editing."),
+                    err=True,
+                )
+            if adopted_personas:
+                click.echo(
+                    o.success(f"Copied personas to your org for editing: {', '.join(adopted_personas)}"),
+                    err=True,
+                )
+
+        # Print full run context so the user can see what's happening.
+        click.echo(o.bold("Run context"), err=True)
+        click.echo(f"  backend:  {backend_name}", err=True)
+        click.echo(f"  team:     {team_id}", err=True)
+        if team_obj := (ctx.obj["build_service"]._teams.get(team_id) if team_id else None):
+            click.echo(f"  roles:    {' → '.join(team_obj.persona_ids)}", err=True)
+            stages = team_obj.execution_stages()
+            for i, stage in enumerate(stages, 1):
+                marker = "⚡" if len(stage) > 1 else " "
+                click.echo(f"  stage {i}: {marker} {', '.join(stage)}", err=True)
+        if active_project:
+            click.echo(f"  project:  {active_project.id}", err=True)
+        click.echo(f"  workdir:  {workdir}", err=True)
+        click.echo(o.dim("  Handing off to backend..."), err=True)
+        click.echo()
 
         try:
             result = run_svc.execute(
@@ -738,23 +775,6 @@ def run(ctx: click.Context, task: tuple[str, ...], team: str | None, solo: bool,
         except RuntimeError as e:
             click.echo(o.error(f"Execution failed: {e}"), err=True)
             raise SystemExit(1)
-        # Report any auto-adoption that happened on first use.
-        adopted_personas = getattr(run_svc, "last_adopted_personas", []) or []
-        adopted_team = getattr(run_svc, "last_adopted_team", None)
-        if adopted_personas:
-            click.echo(
-                o.success(
-                    f"Copied to ~/.agent-org/personas/ for editing: {', '.join(adopted_personas)}"
-                ),
-                err=True,
-            )
-        if adopted_team:
-            click.echo(
-                o.success(
-                    f"Copied to ~/.agent-org/teams/ for editing: {adopted_team}.yaml"
-                ),
-                err=True,
-            )
         if result.output:
             click.echo(result.output)
         click.echo(o.success("Run complete.") + f" {o.dim(result.budget_summary)}", err=True)

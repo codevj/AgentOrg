@@ -61,21 +61,48 @@ class FileRunStore:
         lines = [
             f"# Run: {run.id}",
             "",
+            "## Task",
+            "",
+            run.task,
+            "",
+            "## Context",
+            "",
+            f"- **Date**: {run.date.strftime('%Y-%m-%d %H:%M:%S UTC')}",
             f"- **Mode**: {run.mode.value}",
+            f"- **Status**: {run.status.value}",
         ]
         if run.team_id:
             lines.append(f"- **Team**: {run.team_id}")
-        lines.extend([
-            f"- **Task**: {run.task}",
-            f"- **Date**: {run.date.strftime('%Y-%m-%d %H:%M:%S UTC')}",
-            f"- **Status**: {run.status.value}",
-        ])
         if run.backend:
             lines.append(f"- **Backend**: {run.backend}")
+        if run.org_name:
+            lines.append(f"- **Org**: {run.org_name}")
+        if run.project_id:
+            lines.append(f"- **Project**: {run.project_id}")
+        if run.workdir:
+            lines.append(f"- **Workdir**: `{run.workdir}`")
+        if run.reflection_mode:
+            lines.append(f"- **Reflection mode**: {run.reflection_mode}")
+
+        # Team composition and stages
+        if run.roles:
+            lines.extend(["", "## Team", "", f"Roles: {', '.join(run.roles)}"])
+        if run.stages:
+            lines.append("")
+            lines.append("### Execution stages")
+            lines.append("")
+            for i, stage in enumerate(run.stages, 1):
+                marker = " (parallel)" if len(stage) > 1 else ""
+                lines.append(f"- Stage {i}{marker}: {', '.join(stage)}")
+
+        # Budget
         if run.budget_summary:
-            lines.append(f"- **Budget**: {run.budget_summary}")
+            lines.extend(["", "## Budget", "", run.budget_summary])
+
+        # Output
         if run.output:
             lines.extend(["", "## Output", "", run.output])
+
         return "\n".join(lines) + "\n"
 
     @staticmethod
