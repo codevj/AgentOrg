@@ -114,13 +114,21 @@ class CursorBackend:
             keep.add(filename)
             synced += 1
 
-        # Generate a lead prompt for this team (used by execute).
+        # Generate lead prompt(s). If a team is specified, only that one;
+        # otherwise generate leads for all teams.
         if team_id:
             team = self._teams.get(team_id)
             if team:
                 self._generate_lead(team)
                 keep.add(self._lead_filename(team_id))
                 synced += 1
+        else:
+            for tid in self._teams.list_ids():
+                team = self._teams.get(tid)
+                if team:
+                    self._generate_lead(team)
+                    keep.add(self._lead_filename(tid))
+                    synced += 1
 
         self._cleanup_stale(keep)
         return synced

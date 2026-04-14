@@ -114,13 +114,22 @@ class ClaudeBackend:
             keep.add(filename)
             synced += 1
 
-        # Generate fleet-lead for team mode
+        # Generate lead(s). If team_id is given, generate only that team's
+        # lead; otherwise generate leads for all teams so switching teams
+        # works without re-syncing.
         if team_id:
             team = self._teams.get(team_id)
             if team:
                 self._generate_lead(team)
                 keep.add(self._lead_filename(team.id))
                 synced += 1
+        else:
+            for tid in self._teams.list_ids():
+                team = self._teams.get(tid)
+                if team:
+                    self._generate_lead(team)
+                    keep.add(self._lead_filename(team.id))
+                    synced += 1
 
         # Generate fleet-helper (always present, not org-namespaced)
         helper_content = self._renderer.render("claude_helper.md.j2", {})
